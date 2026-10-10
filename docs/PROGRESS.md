@@ -78,10 +78,28 @@ This document tracks the verified status, execution tests, unverified items, and
 ---
 
 ### Phase 3: Catalog & Static Content
-- **Status:** Pending Execution
-- **What Was Verified:** -
-- **What Is Unverified:** -
-- **How to Run:** -
+- **Status:** **Completed & Verified**
+- **What Was Verified:**
+  - Seeded 3 core technologies into MongoDB `technologies` collection:
+    - **Python:** `runnableInSandbox: true`, official docs: `https://docs.python.org/3/` (PSFL)
+    - **JavaScript (Node.js):** `runnableInSandbox: true`, official docs: `https://nodejs.org/docs/latest/api/` (MIT)
+    - **Redis:** `runnableInSandbox: false`, official docs: `https://redis.io/docs/latest/` (RSALv2/SSPLv1)
+  - All URLs verified with HTTP 200 responses.
+  - All content marked with `reviewStatus: "needs human review"`.
+  - Technology catalog and detail API endpoints (`server/routes/tech.routes.js`).
+  - Automated integration test (`server/test/tech.test.js`) verifying catalog listing, static details, and 404 responses.
+  - Responsive frontend: `CatalogPage.jsx`, `TechnologyPage.jsx` with static tabs (Overview, Why & Where, Setup, Common Pitfalls, Code Example), and `ReviewBanner.jsx`.
+- **What Is Unverified:**
+  - Content marked for human review per Rule 5.
+- **How to Run:**
+  ```powershell
+  # Seed database
+  node scripts/seed_technologies.js
+
+  # Run test suite
+  cd d:\codara\server
+  npm test
+  ```
 
 ---
 
