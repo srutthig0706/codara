@@ -1,0 +1,509 @@
+# Codara: System Architecture Specification
+
+This document details the architectural design, folder hierarchy, database schemas, API contracts, JSON validation schemas, and technical justifications for **Codara**.
+
+---
+
+## 1. System Topology & Data Flow
+
+```mermaid
+graph TB
+    subgraph Client ["Client (React + Vite, Vanilla CSS, Monaco, React Flow)"]
+        UI_Catalog[Catalog Page]
+        UI_Tech[Technology Page]
+        UI_Static[Static Content Panel]
+        UI_Flow[React Flow Architecture Visualizer]
+        UI_Monaco[Monaco Editor Component]
+        UI_BoundedAI[Bounded Action Triggers]
+    end
+
+    subgraph Server ["Server (Node.js + Express)"]
+        Router[Express Router]
+        AuthMW[JWT Auth Middleware]
+        RateLimiter[express-rate-limit]
+        
+        subgraph Services ["Backend Core Services"]
+            LLMWrapper["generateJSON(prompt, schema)"]
+            RAGService["RAG Engine (Transformers.js all-MiniLM-L6-v2)"]
+            SandboxService["Judge0 CE Client Interface"]
+            CacheService["MongoDB AI Cache (SHA-256)"]
+        end
+    end
+
+    subgraph DataStore ["Local Persistence"]
+        MongoDB[(MongoDB Local: mongodb://localhost:27017/codara)]
+        LocalModels[(Local HuggingFace Cache: ONNX Models)]
+    end
+
+    subgraph External ["External / Container Engines"]
+        GeminiAPI[Google Gemini API]
+        GroqAPI[Groq API (Backup / Fallback)]
+        Judge0Docker[Judge0 CE Docker (http://localhost:2358)]
+    end
+
+    %% Interactions
+    UI_BoundedAI --> Router
+    UI_Monaco --> Router
+    Router --> AuthMW --> RateLimiter
+    RateLimiter --> LLMWrapper
+    RateLimiter --> SandboxService
+    
+    LLMWrapper --> CacheService
+    CacheService -. Cache Hit .-> LLMWrapper
+    CacheService -. Cache Miss .-> GeminiAPI
+    GeminiAPI -. Failover / RateLimit .-> GroqAPI
+    
+    RAGService --> LocalModels
+    RAGService --> MongoDB
+    SandboxService --> Judge0Docker
+    Router --> MongoDB
+```
+
+---
+
+## 2. Directory & File Organization
+
+```
+d:/codara/
+├── .gitignore                      # Git exclusion rules (node_modules, .env, build artifacts)
+├── README.md                       # Setup and run instructions
+├── docs/                           # Architectural, operational, and project specifications
+│   ├── PROJECT_SPEC.md             # Goals, constraints, vision, user journeys
+│   ├── ARCHITECTURE.md             # This document: schemas, routes, diagrams, folders
+│   ├── RULES.md                    # Core operational and pedagogical rules
+│   └── TASKS.md                    # Detailed roadmap of Phases 0 through 10 with criteria
+├── scripts/                        # Automation & evaluation utilities
+│   ├── ingest_docs.js              # Document chunking, embedding generation & DB ingestion
+│   ├── evaluate_rag.js             # Evaluation harness (30 test queries with vs. without RAG)
+│   └── seed_technologies.js        # Seed initial curated technologies (Python, Redis, MongoDB)
+├── client/                         # Frontend Application (React + Vite)
+│   ├── index.html                  # HTML entry point with metadata & Google Fonts
+│   ├── vite.config.js              # Vite configuration (proxies /api to server)
+│   ├── package.json                # Dependencies: react, reactflow, @monaco-editor/react, etc.
+│   └── src/
+│       ├── main.jsx                # React root mount
+│       ├── App.jsx                 # Route manager & global layout
+│       ├── index.css               # Core design system tokens (HSL variables, glassmorphism)
+│       ├── components/             # Reusable UI building blocks
+│       │   ├── Navbar.jsx          # Header with user profile and quick links
+│       │   ├── SourceBadge.jsx     # Citation attribution display
+│       │   ├── ReactFlowViewer.jsx # Architecture scenario/compare visualizer
+│       │   ├── CodeEditor.jsx      # Monaco Editor wrapper with run triggers
+│       │   ├── TradeoffTable.jsx   # Side-by-side architectural trade-off table
+│       │   └── ReviewBanner.jsx    # "Needs human review" banner component
+│       ├── pages/                  # Page-level route views
+│       │   ├── LoginPage.jsx       # Auth login form
+│       │   ├── RegisterPage.jsx    # Auth registration form
+│       │   ├── CatalogPage.jsx     # Technology discovery catalog grid
+│       │   ├── TechnologyPage.jsx  # Main technology hub (static tabs + bounded actions)
+│       │   ├── ScenarioPage.jsx    # With vs. Without visual exploration
+│       │   ├── ComparePage.jsx     # Multi-technology comparative analysis
+│       │   ├── TeachCodePage.jsx   # Step-by-step interactive coding walkthrough
+│       │   └── TestsPage.jsx       # Quizzes and code exercise testing module
+│       └── services/               # Client-side API abstraction
+│           ├── api.js              # Axios / Fetch client with JWT interceptors
+│           └── auth.js             # Local storage token persistence helpers
+└── server/                         # Backend Application (Node.js + Express)
+    ├── .env                        # Private environment variables (GITIGNORED)
+    ├── check-env.js                # Pre-flight environment sanity check
+    ├── package.json                # Dependencies: express, mongodb, zod, @xenova/transformers, etc.
+    ├── server.js                   # Main application entry point & Express bootstrap
+    ├── config/                     # Configuration constants & environment loader
+    │   ├── db.js                   # MongoDB connection lifecycle management
+    │   └── env.js                  # Safe environment accessor & validation
+    ├── middleware/                 # Express middleware modules
+    │   ├── auth.js                 # JWT verification & req.user injection
+    │   ├── rateLimiter.js          # Route-specific express-rate-limit instances
+    │   └── errorHandler.js         # Centralized error handler & status mapper
+    ├── routes/                     # REST API endpoints
+    │   ├── auth.routes.js          # Authentication (register, login, me)
+    │   ├── tech.routes.js          # Technologies catalog and static content
+    │   ├── ai.routes.js            # Bounded AI action routes (explain, scenario, compare, etc.)
+    │   ├── sandbox.routes.js       # Judge0 CE submission and polling proxy
+    │   ├── tests.routes.js         # Quizzes and coding exercises
+    │   └── user.routes.js          # Bookmarks and progress tracking
+    ├── services/                   # Business logic & external systems integration
+    │   ├── llm.service.js          # generateJSON(prompt, schema) with Gemini + Groq failover
+    │   ├── rag.service.js          # Transformers.js embedding & in-memory cosine similarity
+    │   ├── cache.service.js        # MongoDB SHA-256 AI response caching
+    │   └── sandbox.service.js      # Judge0 CE API wrapper with health fallback
+    └── schemas/                    # Zod validation schemas
+        ├── auth.schema.js          # Request validation for auth inputs
+        ├── ai.schema.js            # Structural schemas for LLM JSON outputs
+        └── test.schema.js          # Validation for test submissions
+```
+
+---
+
+## 3. MongoDB Collections & Data Models
+
+### 3.1 `users`
+Stores student accounts and authentication credentials.
+```json
+{
+  "_id": "ObjectId",
+  "name": "Alex Student",
+  "email": "alex@university.edu",
+  "passwordHash": "$2b$10$w... (bcrypt hash)",
+  "createdAt": "2026-10-10T12:00:00Z",
+  "updatedAt": "2026-10-10T12:00:00Z"
+}
+```
+
+### 3.2 `technologies`
+Static curriculum content for each supported technology.
+```json
+{
+  "_id": "ObjectId",
+  "slug": "redis",
+  "name": "Redis",
+  "category": "In-Memory Data Store",
+  "shortDescription": "In-memory data structure store used as a database, cache, and message broker.",
+  "overview": "Redis provides sub-millisecond response times by storing data in RAM...",
+  "whyExists": "Relational databases bottleneck under high read concurrency due to disk I/O...",
+  "whereUsed": "Session caching, rate limiting, leaderboards, real-time analytics pub/sub...",
+  "setupGuide": "Install via Docker: docker run -p 6379:6379 redis:alpine...",
+  "commonErrors": [
+    {
+      "error": "OOM (Out Of Memory) command not allowed",
+      "cause": "Redis exceeded maxmemory without an active eviction policy (e.g., volatile-lru).",
+      "fix": "Configure 'maxmemory-policy allkeys-lru' in redis.conf."
+    }
+  ],
+  "sourceName": "Redis Official Documentation",
+  "sourceUrl": "https://redis.io/docs/latest/",
+  "license": "RSALv2/SSPLv1 (Pre-change: 3-Clause BSD)",
+  "reviewStatus": "needs human review",
+  "runnableInSandbox": false,
+  "createdAt": "2026-10-10T12:00:00Z",
+  "updatedAt": "2026-10-10T12:00:00Z"
+}
+```
+
+### 3.3 `doc_chunks`
+Vectorized documentation chunks for RAG search.
+```json
+{
+  "_id": "ObjectId",
+  "techSlug": "redis",
+  "sourceName": "Redis Docs",
+  "sourceUrl": "https://redis.io/docs/latest/develop/data-types/",
+  "license": "Open Source Documentation",
+  "sectionTitle": "Redis Hashes Overview",
+  "content": "Redis hashes are record types structured as collections of field-value pairs...",
+  "embedding": [0.0245, -0.0891, 0.0123, "... 384 floating point dimensions ..."],
+  "chunkIndex": 4,
+  "createdAt": "2026-10-10T12:00:00Z"
+}
+```
+
+### 3.4 `ai_cache`
+Deduplication and cache store for bounded AI outputs.
+```json
+{
+  "_id": "ObjectId",
+  "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "action": "scenario",
+  "techSlug": "redis",
+  "prompt": "Synthesize a scenario for session state management...",
+  "responseJson": { "nodes": [], "edges": [], "problemPoints": [] },
+  "providerUsed": "gemini",
+  "retrievalCitations": ["https://redis.io/docs/latest/develop/data-types/"],
+  "createdAt": "2026-10-10T12:00:00Z"
+}
+```
+
+### 3.5 `quizzes`
+Multiple-choice and True/False quizzes validated by stored answer keys.
+```json
+{
+  "_id": "ObjectId",
+  "techSlug": "python",
+  "title": "Python Memory Model & Mutability",
+  "questions": [
+    {
+      "id": "q1",
+      "type": "mcq",
+      "question": "What happens when you pass a mutable list to a Python function that appends an item?",
+      "options": [
+        "A new copy is created automatically inside the function",
+        "The original caller list is modified in place",
+        "Python raises an UnboundLocalError",
+        "The list is converted into a tuple"
+      ],
+      "correctAnswerIndex": 1,
+      "explanation": "In Python, arguments are passed by assignment (object reference). Mutating a mutable object alters the caller's instance."
+    }
+  ]
+}
+```
+
+### 3.6 `code_exercises`
+Deterministic coding tasks verified against Judge0 CE test suites.
+```json
+{
+  "_id": "ObjectId",
+  "techSlug": "python",
+  "title": "Find First Non-Repeating Character",
+  "description": "Write a function `first_unique(s: str) -> str` returning the first non-repeating character or an empty string.",
+  "difficulty": "beginner",
+  "languageId": 71,
+  "starterCode": "def first_unique(s: str) -> str:\n    # Your code here\n    pass\n",
+  "referenceSolution": "def first_unique(s: str) -> str:\n    counts = {}\n    for c in s: counts[c] = counts.get(c, 0) + 1\n    for c in s:\n        if counts[c] == 1: return c\n    return ''\n",
+  "testCases": [
+    { "input": "leetcode", "expectedOutput": "l", "isHidden": false },
+    { "input": "loveleetcode", "expectedOutput": "v", "isHidden": false },
+    { "input": "aabb", "expectedOutput": "", "isHidden": true }
+  ],
+  "whyFollowUpPrompt": "Why did you choose your counting data structure (e.g., dict vs. collections.Counter vs. nested iteration)? What are its time and space complexities?"
+}
+```
+
+### 3.7 `user_progress` & `user_bookmarks`
+Tracks individual student mastery and pinned resources.
+```json
+// user_progress
+{
+  "_id": "ObjectId",
+  "userId": "ObjectId(user_id)",
+  "techSlug": "python",
+  "completedQuizzes": ["q1", "q2"],
+  "completedExercises": ["ObjectId(exercise_id)"],
+  "lastVisitedAt": "2026-10-10T12:00:00Z"
+}
+
+// user_bookmarks
+{
+  "_id": "ObjectId",
+  "userId": "ObjectId(user_id)",
+  "targetType": "technology",
+  "targetSlug": "redis",
+  "createdAt": "2026-10-10T12:00:00Z"
+}
+```
+
+---
+
+## 4. API Specification & Endpoints
+
+| Method | Endpoint | Auth | Rate Limit | Purpose |
+| :--- | :--- | :--- | :--- | :--- |
+| `GET` | `/api/health` | Public | None | Check API status, MongoDB connection, & Judge0 availability |
+| `POST` | `/api/auth/register` | Public | 10 req/15m | Register new user account |
+| `POST` | `/api/auth/login` | Public | 10 req/15m | Authenticate credentials and issue JWT |
+| `GET` | `/api/auth/me` | Protected | Standard | Fetch current logged-in user profile |
+| `GET` | `/api/technologies` | Protected | Standard | List all technologies in catalog |
+| `GET` | `/api/technologies/:slug` | Protected | Standard | Retrieve static reviewed content for a technology |
+| `POST` | `/api/ai/explain` | Protected | 20 req/15m | Grounded conceptual explanation citing retrieved sources |
+| `POST` | `/api/ai/scenario` | Protected | 20 req/15m | Synthesizes With vs. Without React Flow architecture graphs |
+| `POST` | `/api/ai/compare` | Protected | 20 req/15m | Generates comparative diagrams, trade-off matrix & what-ifs |
+| `POST` | `/api/ai/teach-code` | Protected | 20 req/15m | Step-by-step interactive coding lesson |
+| `POST` | `/api/ai/feedback` | Protected | 20 req/15m | Explains failure or reviews design choices based on tests |
+| `POST` | `/api/sandbox/execute`| Protected | 30 req/15m | Submits code to Judge0 CE and evaluates against test suite |
+| `GET` | `/api/tests/quizzes/:slug`| Protected | Standard | Fetches quiz questions (excluding answer keys) |
+| `POST` | `/api/tests/quizzes/submit`| Protected | Standard | Evaluates quiz against stored keys deterministically |
+| `GET` | `/api/tests/exercises/:slug`| Protected | Standard | Fetches coding exercises (excluding hidden test cases) |
+| `POST` | `/api/user/progress` | Protected | Standard | Record completed quiz/exercise |
+| `GET` | `/api/user/bookmarks` | Protected | Standard | Fetch user bookmarks |
+| `POST` | `/api/user/bookmarks` | Protected | Standard | Add / remove a bookmark |
+
+---
+
+## 5. Zod Schemas for Structured AI Outputs
+
+All AI actions are strictly enforced via Zod. Any response failing schema validation triggers an automatic single-retry containing the error trace, or fails over to Groq.
+
+### 5.1 Explain Schema (`ExplainResponseSchema`)
+```javascript
+const ExplainResponseSchema = z.object({
+  concept: z.string(),
+  summary: z.string().describe("Concise 2-3 sentence overview"),
+  coreMechanism: z.string().describe("How it works under the hood"),
+  realWorldAnalogy: z.string().describe("Intuitive mental model analogy"),
+  keyTakeaway: z.string(),
+  citations: z.array(z.object({
+    sourceName: z.string(),
+    sourceUrl: z.string().url(),
+    relevance: z.string()
+  })).min(1, "Must cite at least one retrieved document")
+});
+```
+
+### 5.2 Scenario Schema: With vs. Without (`ScenarioResponseSchema`)
+Generates nodes and edges directly consumable by React Flow.
+```javascript
+const FlowNodeSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  type: z.enum(["client", "server", "database", "cache", "queue", "bottleneck"]),
+  isProblemNode: z.boolean().default(false),
+  details: z.string()
+});
+
+const FlowEdgeSchema = z.object({
+  id: z.string(),
+  source: z.string(),
+  target: z.string(),
+  label: z.string().optional(),
+  animated: z.boolean().default(false),
+  isFailingEdge: z.boolean().default(false)
+});
+
+const ScenarioResponseSchema = z.object({
+  scenarioTitle: z.string(),
+  contextDescription: z.string(),
+  withoutTech: z.object({
+    narrative: z.string().describe("What happens when this technology is missing"),
+    problemPoints: z.array(z.string()).min(1),
+    nodes: z.array(FlowNodeSchema),
+    edges: z.array(FlowEdgeSchema)
+  }),
+  withTech: z.object({
+    narrative: z.string().describe("How the architecture stabilizes when the technology is introduced"),
+    benefitsRealized: z.array(z.string()).min(1),
+    nodes: z.array(FlowNodeSchema),
+    edges: z.array(FlowEdgeSchema)
+  }),
+  citations: z.array(z.object({
+    sourceName: z.string(),
+    sourceUrl: z.string().url()
+  }))
+});
+```
+
+### 5.3 Compare Alternatives Schema (`CompareResponseSchema`)
+```javascript
+const CompareResponseSchema = z.object({
+  projectDescription: z.string(),
+  technologiesCompared: z.array(z.string()).min(2).max(3),
+  tradeoffMatrix: z.array(z.object({
+    criterion: z.string().describe("e.g., Read Latency, Data Durability, Operational Complexity"),
+    ratings: z.record(z.string(), z.string()).describe("Map of techSlug to evaluation string")
+  })),
+  recommendedChoice: z.string(),
+  recommendationReason: z.string(),
+  presetWhatIfs: z.array(z.object({
+    buttonLabel: z.string().describe("e.g., What if traffic spikes 100x?"),
+    resultingVerdict: z.string().describe("How the recommendation changes under this condition")
+  })).min(2),
+  citations: z.array(z.object({
+    sourceName: z.string(),
+    sourceUrl: z.string().url()
+  }))
+});
+```
+
+### 5.4 Teach-to-Code Schema (`TeachCodeResponseSchema`)
+```javascript
+const TeachCodeResponseSchema = z.object({
+  technology: z.string(),
+  lessonTitle: z.string(),
+  objective: z.string(),
+  steps: z.array(z.object({
+    stepNumber: z.number(),
+    title: z.string(),
+    conceptExplanation: z.string(),
+    starterSnippet: z.string(),
+    expectedOutputHint: z.string()
+  })),
+  citations: z.array(z.object({
+    sourceName: z.string(),
+    sourceUrl: z.string().url()
+  }))
+});
+```
+
+### 5.5 Exercise Feedback Schemas (`FeedbackSchemas`)
+```javascript
+// On Failure: Grounded in Judge0 error output + stored reference solution
+const ExerciseErrorFeedbackSchema = z.object({
+  failureAnalysis: z.string().describe("Why the code failed based on compiler/test output"),
+  conceptualMisunderstanding: z.string(),
+  hintWithoutGivingAnswer: z.string(),
+  relevantDocsReference: z.string()
+});
+
+// On Success: Reflection prompt on algorithm choices
+const ExerciseSuccessFollowUpSchema = z.object({
+  approachEvaluation: z.string().describe("Analysis of student's algorithmic structure"),
+  timeSpaceComplexityFeedback: z.string(),
+  followUpReflectionQuestion: z.string().describe("Thought-provoking question on alternatives")
+});
+```
+
+---
+
+## 6. Subsystem Architectures
+
+### 6.1 Dual-Provider LLM Wrapper (`generateJSON`)
+```mermaid
+sequenceDiagram
+    participant Route as Express Route
+    participant Wrapper as generateJSON()
+    participant Cache as MongoDB ai_cache
+    participant Gemini as Google Gemini
+    participant Groq as Groq Cloud
+    participant Validator as Zod Validator
+
+    Route->>Wrapper: prompt, zodSchema, options
+    Wrapper->>Cache: Check SHA-256(prompt + schemaName)
+    alt Cache Hit
+        Cache-->>Wrapper: Cached JSON
+        Wrapper-->>Route: Return Cached Object
+    else Cache Miss
+        Wrapper->>Gemini: Request JSON Mode
+        alt Gemini Success
+            Gemini-->>Wrapper: Raw JSON String
+            Wrapper->>Validator: Validate Schema
+            alt Zod Valid
+                Validator-->>Wrapper: Valid Object
+                Wrapper->>Cache: Save to ai_cache
+                Wrapper-->>Route: Return Object
+            else Zod Invalid
+                Wrapper->>Gemini: Retry once with Error Trace
+                alt Retry Valid
+                    Wrapper->>Cache: Save & Return
+                else Retry Invalid
+                    Wrapper->>Groq: Fallback to Groq
+                end
+            end
+        else Gemini Error / Rate Limit (HTTP 429)
+            Wrapper->>Groq: Fallback to Groq
+            Groq-->>Wrapper: Raw JSON String
+            Wrapper->>Validator: Validate Schema
+            Wrapper->>Cache: Save & Return
+        end
+    end
+```
+
+### 6.2 Local RAG Engine (Transformers.js + Cosine Similarity)
+1. **Model:** Xenova/all-MiniLM-L6-v2 (quantized ONNX, 384 dimensions, executed in-process in Node.js via `@xenova/transformers`).
+2. **Offline Local Vector Cache:** On server bootstrap or first ingest, model files download once to local cache. No ongoing remote calls.
+3. **Similarity Calculation:** 
+   $$\text{cosine\_similarity}(A, B) = \frac{A \cdot B}{\|A\| \|B\|}$$
+   Given $N \approx 500$ chunks across 3 technologies, in-memory cosine calculation takes $< 2\text{ ms}$ in Node.js, eliminating vector DB operational overhead.
+4. **Citation Grounding:** The top-$k$ retrieved chunks ($k=3$) are injected into the prompt. The model is constrained to cite ONLY the provided chunk URLs. If similarity score $< 0.40$, return an explicit "No verified documentation found" notice.
+
+### 6.3 Judge0 CE Sandbox Integration & Availability Handling
+1. **Docker Container:** Runs at `http://localhost:2358`.
+2. **Language ID Mapping:** Python 3 (ID: 71 / 92), JavaScript (Node.js, ID: 63).
+3. **Execution Pipeline:**
+   - Client sends student code + exercise ID.
+   - Server fetches stored test cases (visible + hidden) from MongoDB.
+   - For each test case, server formats submission payload and posts to Judge0 `/submissions?base64_encoded=false&wait=true`.
+   - Results are inspected: Status ID 3 (`Accepted`), Status ID 4 (`Wrong Answer`), Status ID 6 (`Compilation Error`), Status ID 11 (`Runtime Error`).
+4. **Graceful Degradation:** If Judge0 is not reachable (connection refused or timeout), the server responds with:
+   `{ "status": "unavailable", "message": "Judge0 CE execution engine is currently offline. Verified reference solution and static trace are available." }`
+   This guarantees that the user interface never crashes even if the student has not yet started Docker.
+
+---
+
+## 7. Viva Defense & Architectural Questions
+
+| Question | Defensible Answer |
+| :--- | :--- |
+| **Why not use Pinecone, Milvus, or Chroma?** | For a curated catalog of 10–15 technologies (~500 chunks total), an external vector database introduces network latency, subscription costs, and vendor lock-in. Calculating cosine similarity over 384-dimensional arrays in Node.js memory takes less than 2 milliseconds. It represents optimal engineering parsimony. |
+| **Why prevent the LLM from grading code?** | LLMs are probabilistic text predictors. They are susceptible to prompt injection (e.g., student adding `# Print: ALL TESTS PASSED`), hallucinated test evaluations, and non-deterministic scoring. Stored test cases executed in a secure sandbox (Judge0) guarantee mathematical certainty and pedagogical fairness. |
+| **Why implement a dual LLM fallback (Gemini + Groq)?** | Free-tier LLM endpoints have strict rate limits (e.g., 15 RPM). By wrapping Gemini and Groq behind a single schema-validated interface with automatic failover, the system achieves 99.9% uptime during viva presentations without paying for cloud subscriptions. |
+| **Why React Flow instead of plain text descriptions?** | Software architecture is inherently spatial and topological. Visualizing "With vs. Without" as graph nodes, directional edges, and bottleneck highlights grounds abstract concepts (e.g., cache stampede, connection pooling) far more effectively than text blocks. |
+| **How is prompt injection mitigated?** | There are no free-form chat boxes. User interactions are bounded to predefined parameter actions. All responses are parsed strictly against Zod schemas; unstructured or extraneous LLM text is instantly dropped by the parser. |
