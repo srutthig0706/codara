@@ -97,9 +97,9 @@ flowchart TD
 | Tech Slug | Name | Category | Primary Focus in Codara | Sandbox Execution |
 | :--- | :--- | :--- | :--- | :--- |
 | `python` | Python 3 | Core Programming & Scripting | Syntax, memory model, data structures, common errors | Supported (Judge0 Python 3) |
-| `redis` | Redis | In-Memory Data Store & Caching | Key-value caching, TTL, pub/sub, cache stampede prevention | Read-Only / Client Mock |
-| `mongodb` | MongoDB | Document Database | Document modeling, aggregation pipeline, indexing | Read-Only / Client Mock |
-| *Target 10-15* | *PostgreSQL, Docker, Git, TypeScript, etc.* | *Infrastructure & Languages* | *Future expansion modules* | *According to runtime* |
+| `javascript` | JavaScript (Node.js) | Dynamic Runtime & Scripting | Event loop, async/await, closures, prototypical inheritance | Supported (Judge0 Node.js) |
+| `redis` | Redis | In-Memory Data Store & Caching | Key-value caching, TTL, pub/sub, cache stampede prevention | Read-Only (Requires Server Daemon) |
+| *Later items* | *MongoDB, PostgreSQL, Docker, etc.* | *Databases & Infrastructure* | *Future expansion modules* | *According to runtime* |
 
 ---
 

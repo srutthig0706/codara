@@ -1,2 +1,23 @@
-node_modules
+# Dependencies
+node_modules/
+*/node_modules/
+
+# Environment Variables & Secrets (CRITICAL)
 .env
+.env.*
+server/.env
+
+# Infrastructure & passwords
+infra/judge0/
+infra/judge0/*
+
+# Build outputs
+dist/
+client/dist/
+
+# System / logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+Thumbs.db

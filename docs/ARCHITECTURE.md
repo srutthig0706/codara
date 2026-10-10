@@ -199,13 +199,17 @@ Vectorized documentation chunks for RAG search.
 
 ### 3.4 `ai_cache`
 Deduplication and cache store for bounded AI outputs.
+Cache Key Generation:
+$$\text{key} = \text{SHA-256}(\text{techSlug} + \text{":"} + \text{action} + \text{":"} + \text{normalizedInput} + \text{":"} + \text{promptVersion})$$
+where `normalizedInput` is trimmed and lowercased.
 ```json
 {
   "_id": "ObjectId",
   "hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
   "action": "scenario",
   "techSlug": "redis",
-  "prompt": "Synthesize a scenario for session state management...",
+  "prompt": "synthesize a scenario for session state management...",
+  "promptVersion": "v1.0",
   "responseJson": { "nodes": [], "edges": [], "problemPoints": [] },
   "providerUsed": "gemini",
   "retrievalCitations": ["https://redis.io/docs/latest/develop/data-types/"],
@@ -215,6 +219,7 @@ Deduplication and cache store for bounded AI outputs.
 
 ### 3.5 `quizzes`
 Multiple-choice and True/False quizzes validated by stored answer keys.
+> **SECURITY GUARANTEE:** `correctAnswerIndex` is NEVER exposed to the client in any API endpoint. Evaluation is strictly executed server-side.
 ```json
 {
   "_id": "ObjectId",
@@ -240,6 +245,7 @@ Multiple-choice and True/False quizzes validated by stored answer keys.
 
 ### 3.6 `code_exercises`
 Deterministic coding tasks verified against Judge0 CE test suites.
+> **SECURITY GUARANTEE:** Hidden test cases (`isHidden: true`) and `referenceSolution` are NEVER returned by any client API endpoint. Code is sent to the server, executed against the full suite in the sandbox, and only assertion summaries (passed/failed counts, visible failures) are returned.
 ```json
 {
   "_id": "ObjectId",
@@ -476,15 +482,23 @@ sequenceDiagram
     end
 ```
 
-### 6.2 Local RAG Engine (Transformers.js + Cosine Similarity)
+### 6.2 Local RAG Engine (Transformers.js + In-Memory Cosine Similarity)
 1. **Model:** Xenova/all-MiniLM-L6-v2 (quantized ONNX, 384 dimensions, executed in-process in Node.js via `@xenova/transformers`).
-2. **Offline Local Vector Cache:** On server bootstrap or first ingest, model files download once to local cache. No ongoing remote calls.
-3. **Similarity Calculation:** 
+2. **Server Startup Vector Ingestion:** On server startup, all document chunks and their precomputed 384-dimensional embeddings are loaded once from MongoDB into an in-memory array (`memoryChunkStore`). 
+3. **In-Memory Cosine Similarity:**
    $$\text{cosine\_similarity}(A, B) = \frac{A \cdot B}{\|A\| \|B\|}$$
-   Given $N \approx 500$ chunks across 3 technologies, in-memory cosine calculation takes $< 2\text{ ms}$ in Node.js, eliminating vector DB operational overhead.
+   Queries are embedded on-the-fly via the local ONNX model, and similarity scores are calculated against the in-memory vectors without per-query database reads.
 4. **Citation Grounding:** The top-$k$ retrieved chunks ($k=3$) are injected into the prompt. The model is constrained to cite ONLY the provided chunk URLs. If similarity score $< 0.40$, return an explicit "No verified documentation found" notice.
 
-### 6.3 Judge0 CE Sandbox Integration & Availability Handling
+### 6.3 Authentication & JWT Token Management
+1. **Storage Choice:** JWTs are stored in the client's `localStorage` and sent via standard `Authorization: Bearer <token>` HTTP request headers.
+2. **Rationale:** 
+   - Decoupled SPA Architecture: Facilitates independent deployment and local proxying between Vite (port 5173) and Express (port 5000) without cross-site cookie configuration complexity or CORS/SameSite cookie edge-cases across local network ports.
+   - Elimination of CSRF: Bearer headers stored in script memory / storage are not automatically transmitted by the browser on cross-origin requests, eliminating standard Cross-Site Request Forgery (CSRF) vectors.
+   - XSS Mitigation: XSS risks are mitigated by avoiding `dangerouslySetInnerHTML`, sanitizing all dynamic markdown, and using strict Zod schemas for all client-bound data.
+3. **Expiry Policy:** The access token is set to expire in **7 days** (`7d`). This balance provides convenient developer / student experience during testing sessions without requiring frequent re-authentication, while preventing indefinite token validity. Token invalidation upon logout is handled client-side by destroying the stored token and clearing session state.
+
+### 6.4 Judge0 CE Sandbox Integration & Availability Handling
 1. **Docker Container:** Runs at `http://localhost:2358`.
 2. **Language ID Mapping:** Python 3 (ID: 71 / 92), JavaScript (Node.js, ID: 63).
 3. **Execution Pipeline:**

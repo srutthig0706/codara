@@ -201,6 +201,16 @@ This document outlines the sequential phases (0 through 10) for building **Codar
   4. Output results to `eval_results.json` and `eval_results.csv`.
   5. Write comprehensive `README.md` with step-by-step setup, Docker instructions, environment variable keys, and troubleshooting tips.
 - **Acceptance Criteria:**
-  - [ ] Evaluation script executes all 30 test cases without unhandled errors.
+- [ ] Evaluation script executes all 30 test cases without unhandled errors.
   - [ ] Generates clean CSV and JSON reports comparing RAG vs. No-RAG metrics.
   - [ ] `README.md` allows any examiner or student to set up and run the project from scratch.
+
+---
+
+## Extensions (Do Not Build)
+The following features are architectural extensions identified for future work and must NOT be built during the core project implementation:
+1. **"Break It" Impact Simulation via Graph Traversal:** Simulating cascading failure scenarios when a service node is disabled by traversing the React Flow dependency graph.
+2. **Misconception Tags on Quiz Options:** Diagnostic tagging on each distractor option to categorize the precise conceptual mistake a student makes.
+3. **Trust Badges:** Cryptographic or visual verifiability badges displayed on static content indicating exact commit hashes of upstream documentation.
+4. **In-App Evaluation Results Page:** A UI dashboard page displaying automated RAG benchmark metrics within the user interface.
+
