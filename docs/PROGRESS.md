@@ -31,10 +31,24 @@ This document tracks the verified status, execution tests, unverified items, and
 ---
 
 ### Phase 1: Project Skeleton
-- **Status:** Pending Execution
-- **What Was Verified:** -
-- **What Is Unverified:** -
-- **How to Run:** -
+- **Status:** **Completed & Verified**
+- **What Was Verified:**
+  - Express server bootstrapped with CORS, JSON body parser, and graceful MongoDB connection pooling (`server/config/db.js`).
+  - `GET /api/health` verified with automated test (`server/test/health.test.js`) returning HTTP 200 with MongoDB connected and Judge0 status reported.
+  - Client scaffolded with Vite + React, Monaco Editor, React Flow, and Lucide icons.
+  - Dark-mode design system with HSL variables, glassmorphic cards, and typography in `client/src/index.css`.
+  - Vite reverse-proxy for `/api` to port 5000 verified. Production build (`npm run build`) succeeded in 1.71s.
+- **What Is Unverified:**
+  - Judge0 Docker daemon is offline (handled gracefully via the offline fallback).
+- **How to Run:**
+  ```powershell
+  # Test backend health check
+  cd d:\codara\server
+  npm test
+
+  # Run dev server
+  npm start
+  ```
 
 ---
 
