@@ -12,6 +12,10 @@ const JUDGE0_URL = process.env.JUDGE0_URL || "http://localhost:2358";
 app.use(cors());
 app.use(express.json());
 
+// Routes
+const authRoutes = require("./routes/auth.routes");
+app.use("/api/auth", authRoutes);
+
 // Pre-flight health check endpoint
 app.get("/api/health", async (req, res) => {
   const mongoOk = await pingDB();
