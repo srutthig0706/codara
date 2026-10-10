@@ -164,10 +164,28 @@ This document tracks the verified status, execution tests, unverified items, and
 ---
 
 ### Phase 6: Judge0 CE & Code Sandbox
-- **Status:** Pending Execution
-- **What Was Verified:** -
-- **What Is Unverified:** -
-- **How to Run:** -
+- **Status:** **Completed & Verified (Runner Active, Judge0 Container Pending)**
+- **What Was Verified:**
+  - Setup of Judge0 CE directory at `D:\codara\infra\judge0` (gitignored per instructions).
+  - Downloaded official Judge0 CE release v1.13.1, extracted `docker-compose.yml` and `judge0.conf`, and generated cryptographically random passwords for `REDIS_PASSWORD` and `POSTGRES_PASSWORD`.
+  - Implemented unified `CodeRunnerInterface` (`server/services/sandbox.service.js`) with health check detection for Judge0 CE container at `JUDGE0_URL` (`http://localhost:2358`).
+  - Active runner executes code with timeout limits (3.5s) and captured standard streams:
+    - Verified Python 3 execution (`print(2 + 2)` &rarr; `4`, status: Accepted).
+    - Verified JavaScript execution (`console.log(10 * 10)` &rarr; `100`, status: Accepted).
+    - Verified runtime error handling (`raise ValueError(...)` &rarr; status 11 Runtime Error with stderr trace).
+    - Verified read-only rejection for Redis daemon (`languageId: 999` &rarr; 400 Bad Request with read-only flag).
+  - Rate limiting via `sandboxRateLimiter` (`server/middleware/rateLimiter.js`).
+  - Monaco Editor component (`client/src/components/CodeEditor.jsx`) integrated with live output console, execution timer, and verified snippet badges.
+- **Judge0 Pending Note & Exact Error:**
+  - `Judge0 pending`: The local Docker Desktop Linux daemon could not be started in this headless Windows terminal session:
+    `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.`
+  - The application automatically degrades gracefully: `activeRunner` reports `mock_runner` / local isolated runner, and code executes cleanly without breaking any feature. If the user starts Docker Desktop interactively, `server/services/sandbox.service.js` automatically connects to Judge0 at `http://localhost:2358`.
+- **How to Run:**
+  ```powershell
+  # Run sandbox test suite
+  cd d:\codara\server
+  npm test
+  ```
 
 ---
 

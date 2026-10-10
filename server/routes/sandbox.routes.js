@@ -1,0 +1,60 @@
+const express = require("express");
+const authMiddleware = require("../middleware/auth");
+const { sandboxRateLimiter } = require("../middleware/rateLimiter");
+const { 
+  SUPPORTED_LANGUAGES, 
+  checkJudge0Health, 
+  executeCode 
+} = require("../services/sandbox.service");
+
+const router = express.Router();
+
+// GET /api/sandbox/status - check execution runner status and available languages
+router.get("/status", async (req, res) => {
+  const isJudge0Online = await checkJudge0Health();
+  return res.status(200).json({
+    judge0Online: isJudge0Online,
+    activeRunner: isJudge0Online ? "judge0" : "mock_runner",
+    supportedLanguages: SUPPORTED_LANGUAGES,
+    note: isJudge0Online 
+      ? "Judge0 CE Docker container is running." 
+      : "Judge0 CE is offline. Local isolated runner is active for Python & Node.js."
+  });
+});
+
+// POST /api/sandbox/execute - execute code in sandbox
+router.post("/execute", authMiddleware, sandboxRateLimiter, async (req, res) => {
+  try {
+    const { sourceCode, languageId, stdin, expectedOutput } = req.body;
+
+    if (!sourceCode || typeof sourceCode !== "string") {
+      return res.status(400).json({ error: "sourceCode string is required." });
+    }
+
+    const langId = Number(languageId);
+    if (!langId) {
+      return res.status(400).json({ error: "Valid numeric languageId is required." });
+    }
+
+    if (langId === 999) {
+      return res.status(400).json({
+        error: "Redis requires an external background server daemon and cannot be executed as a standalone script.",
+        readOnly: true
+      });
+    }
+
+    const result = await executeCode({
+      sourceCode,
+      languageId: langId,
+      stdin: stdin || "",
+      expectedOutput: expectedOutput || null
+    });
+
+    return res.status(200).json({ execution: result });
+  } catch (err) {
+    console.error("[SANDBOX] Execution error:", err.message);
+    return res.status(500).json({ error: "Failed to execute submission in sandbox." });
+  }
+});
+
+module.exports = router;

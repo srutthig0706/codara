@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../context/AuthContext';
 import ReviewBanner from '../components/ReviewBanner';
+import CodeEditor from '../components/CodeEditor';
 import { 
   ArrowLeft, BookOpen, HelpCircle, Layers, GitCompare, Code2, 
   CheckSquare, Terminal, AlertTriangle, ShieldCheck, Bookmark, ExternalLink 
@@ -14,10 +16,14 @@ export default function TechnologyPage({
   onTriggerTeachCode, 
   onTriggerTests 
 }) {
+  const { token } = useAuth();
   const [tech, setTech] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [activeTab, setActiveTab] = useState('overview');
+  const [editorCode, setEditorCode] = useState('');
+  const [isRunning, setIsRunning] = useState(false);
+  const [executionResult, setExecutionResult] = useState(null);
 
   useEffect(() => {
     async function fetchTech() {
@@ -28,6 +34,7 @@ export default function TechnologyPage({
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         setTech(data.technology);
+        setEditorCode(data.technology.codeExample || '');
       } catch (err) {
         setError(err.message);
       } finally {
@@ -36,6 +43,38 @@ export default function TechnologyPage({
     }
     fetchTech();
   }, [techSlug]);
+
+  const handleRunCode = async () => {
+    if (!tech?.runnableInSandbox) return;
+    setIsRunning(true);
+    setExecutionResult(null);
+    try {
+      const languageId = techSlug === 'python' ? 71 : 63;
+      const res = await fetch('/api/sandbox/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          sourceCode: editorCode,
+          languageId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Execution failed');
+      setExecutionResult(data.execution);
+    } catch (err) {
+      setExecutionResult({
+        status: { id: 13, description: 'Error' },
+        stderr: err.message,
+        stdout: ''
+      });
+    } finally {
+      setIsRunning(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -228,25 +267,27 @@ export default function TechnologyPage({
         {activeTab === 'code' && (
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-              <h3>Reference Code Example</h3>
-              {!tech.runnableInSandbox && (
-                <span className="badge badge-readonly">
-                  [Read-Only: Requires Local / Containerized Service]
-                </span>
-              )}
+              <div>
+                <h3 style={{ fontSize: '1.2rem', marginBottom: '0.2rem' }}>Interactive Code Example</h3>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem' }}>
+                  {tech.runnableInSandbox 
+                    ? "Edit and execute this snippet in the sandboxed runtime below."
+                    : "Daemon architecture services are displayed read-only."}
+                </p>
+              </div>
             </div>
-            <pre style={{
-              background: 'var(--bg-input)',
-              padding: '1.5rem',
-              borderRadius: 'var(--radius-md)',
-              border: '1px solid var(--border-subtle)',
-              color: '#f8fafc',
-              fontSize: '0.875rem',
-              overflowX: 'auto',
-              lineHeight: '1.6'
-            }}>
-              <code>{tech.codeExample}</code>
-            </pre>
+
+            <CodeEditor
+              code={editorCode}
+              onChange={(val) => setEditorCode(val || '')}
+              language={tech.slug === 'python' ? 'python' : 'javascript'}
+              isRunnable={tech.runnableInSandbox}
+              onRun={handleRunCode}
+              isRunning={isRunning}
+              executionResult={executionResult}
+              isVerified={true}
+              height="360px"
+            />
           </div>
         )}
       </div>
