@@ -16,8 +16,10 @@ app.use(express.json());
 // Routes
 const authRoutes = require("./routes/auth.routes");
 const techRoutes = require("./routes/tech.routes");
+const aiRoutes = require("./routes/ai.routes");
 app.use("/api/auth", authRoutes);
 app.use("/api/technologies", techRoutes);
+app.use("/api/ai", aiRoutes);
 
 // Pre-flight health check endpoint
 app.get("/api/health", async (req, res) => {

@@ -5,6 +5,8 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import CatalogPage from './pages/CatalogPage';
 import TechnologyPage from './pages/TechnologyPage';
+import ScenarioPage from './pages/ScenarioPage';
+import ExplainModal from './components/ExplainModal';
 import { Server, Database, Cpu, RefreshCw, AlertCircle, ArrowRight } from 'lucide-react';
 
 function MainApp() {
@@ -72,7 +74,22 @@ function MainApp() {
             onTriggerTests={(tech) => setCurrentView('tests')}
           />
         )}
+
+        {currentView === 'scenario' && selectedTechSlug && (
+          <ScenarioPage
+            techSlug={selectedTechSlug}
+            onBack={() => setCurrentView('technology')}
+          />
+        )}
       </main>
+
+      {/* Modals */}
+      {activeModal?.action === 'explain' && (
+        <ExplainModal
+          tech={activeModal.tech}
+          onClose={() => setActiveModal(null)}
+        />
+      )}
 
       <footer style={{ borderTop: '1px solid var(--border-subtle)', padding: '1.25rem', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
         Codara &copy; 2026 &bull; Discover. Understand. Code. &bull; College Full-Stack + Bounded AI

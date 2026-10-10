@@ -133,10 +133,33 @@ This document tracks the verified status, execution tests, unverified items, and
 ---
 
 ### Phase 5: Dual LLM Wrapper, Explain & Scenario
-- **Status:** Pending Execution
-- **What Was Verified:** -
-- **What Is Unverified:** -
-- **How to Run:** -
+- **Status:** **Completed & Verified**
+- **What Was Verified:**
+  - Unified server-side LLM wrapper `generateJSON(prompt, schema)` (`server/services/llm.service.js`) with:
+    - Primary Gemini API (`gemini-3.8-flash` / `gemini-flash-latest`)
+    - Fallback Groq Cloud API (`openai/gpt-oss-20b`)
+    - Zod schema validation with automatic single retry on validation error
+    - Strict citation grounding (enforcing retrieved documentation source URLs only)
+  - Cryptographic caching (`server/services/cache.service.js`):
+    - Key formula: `SHA-256(technology + ":" + action + ":" + normalizedInput + ":" + promptVersion)`
+    - Tested cache hits in $< 50\text{ ms}$ with zero secondary LLM calls.
+  - Rate limiting via `express-rate-limit` on `/api/ai/*` routes (`server/middleware/rateLimiter.js`).
+  - Strict Zod schemas and graph topology validation (`server/schemas/ai.schema.js`) verifying:
+    - All edges reference existing source/target node IDs
+    - Technology node presence in `withTech` graph
+  - Live API routes: `POST /api/ai/explain` and `POST /api/ai/scenario`.
+  - Frontend UI:
+    - `ExplainModal.jsx` with summary, mechanism, analogy, takeaway, and verified citations panel.
+    - `ScenarioPage.jsx` featuring `@xyflow/react` spatial graph viewer toggling "Without Technology" (bottleneck nodes in crimson) vs "With Technology" (stabilized nodes in emerald).
+  - Client production build verified.
+- **What Is Unverified:**
+  - None for Phase 5.
+- **How to Run:**
+  ```powershell
+  # Run all test suites
+  cd d:\codara\server
+  npm test
+  ```
 
 ---
 
