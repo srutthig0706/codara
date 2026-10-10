@@ -14,6 +14,12 @@ Instead of deploying a specialized vector database (such as Pinecone, Milvus, Qd
 - **Corpus Scale Appropriateness:** For an educational catalog of 3 to 15 technologies with curated documentation (~500 chunks total), linear scanning of 384-dimensional float vectors in memory is computationally trivial for modern CPUs.
 - **Zero Network Overhead:** Eliminates network roundtrips to an external vector cloud service for each retrieval step.
 
+### Measured Performance Benchmarks
+*Measured on Windows 11 using `scripts/test_retrieval.js` across 15 seeded chunks:*
+- **Cold start retrieval (initial embedding pass):** ~203 ms.
+- **Subsequent in-memory cosine retrieval queries:** 6.43 ms to 15.52 ms (including query text embedding via ONNX model on CPU and cosine similarity sorting across all chunks).
+- **Empty / out-of-domain query classification:** 8.67 ms.
+
 ### Trade-Offs & Limitations
 - **Horizontal Scaling Limit:** Because the vector index resides in the Node.js process heap, scaling to hundreds of thousands or millions of chunks would eventually create heap pressure and sub-linear search degradation ($O(N)$ vs. $O(\log N)$ or approximate nearest neighbors like HNSW).
 - **Startup Memory Overhead:** Loading thousands of 384-dimensional float arrays requires resident memory. For ~500 chunks, memory footprint is $< 2\text{ MB}$, but for enterprise-scale corpora ($> 100{,}000$ documents), an external indexing engine with ANN indexing (HNSW/IVF) would be necessary.

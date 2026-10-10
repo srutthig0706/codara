@@ -104,10 +104,31 @@ This document tracks the verified status, execution tests, unverified items, and
 ---
 
 ### Phase 4: Local RAG Pipeline
-- **Status:** Pending Execution
-- **What Was Verified:** -
-- **What Is Unverified:** -
-- **How to Run:** -
+- **Status:** **Completed & Verified**
+- **What Was Verified:**
+  - Local embedding generation via `@xenova/transformers` (`all-MiniLM-L6-v2`, 384 dimensions) running ONNX in-process on CPU without remote vector APIs.
+  - Ingestion utility `scripts/ingest_docs.js` processed 15 curated chunks across Python, JavaScript, and Redis and saved them to MongoDB `doc_chunks`.
+  - In-memory vector store `memoryChunkStore` loaded at startup (`server/services/rag.service.js`).
+  - Cosine similarity retrieval measured with `scripts/test_retrieval.js`:
+    - Cold start: ~203 ms.
+    - Subsequent in-memory queries: 6.43 ms to 15.52 ms.
+    - Accurate top-1 match across all test queries with verified official URLs.
+    - Out-of-domain query safely returned empty verified sources list.
+  - Integration test suite (`server/test/rag.test.js`) verified embedding dimensions, cosine similarity math, chunk memory loading, and threshold filtering.
+- **What Is Unverified:**
+  - None for Phase 4.
+- **How to Run:**
+  ```powershell
+  # Ingest documentation chunks
+  node scripts/ingest_docs.js
+
+  # Benchmark retrieval & latency
+  node scripts/test_retrieval.js
+
+  # Run test suite
+  cd d:\codara\server
+  npm test
+  ```
 
 ---
 

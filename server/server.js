@@ -3,6 +3,7 @@ require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 const express = require("express");
 const cors = require("cors");
 const { connectDB, pingDB } = require("./config/db");
+const { loadChunksIntoMemory } = require("./services/rag.service");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -54,7 +55,8 @@ let serverInstance = null;
 
 async function startServer() {
   try {
-    await connectDB();
+    const db = await connectDB();
+    await loadChunksIntoMemory(db);
     serverInstance = app.listen(PORT, () => {
       console.log(`[Codara Server] Listening on port ${PORT}`);
     });
