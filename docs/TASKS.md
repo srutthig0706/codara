@@ -14,7 +14,7 @@ This document outlines the sequential phases (0 through 10) for building **Codar
 | **3** | **Catalog & Static Content** | Seed Python/Redis/MongoDB, Catalog Page, Tech Detail Page | Phase 2 |
 | **4** | **Local RAG Pipeline** | Transformers.js (`all-MiniLM-L6-v2`), Chunking, Cosine similarity | Phase 3 |
 | **5** | **AI Wrapper, Explain & Scenario** | `generateJSON` (Gemini + Groq failover + SHA-256 cache), React Flow | Phase 4 |
-| **6** | **Judge0 CE & Code Sandbox** | Monaco Editor, Judge0 client, Runnable vs Read-Only execution | Phase 5 |
+| **6** | **Hardened Docker Code Sandbox** | Monaco Editor, Docker throwaway runner, Runnable vs Read-Only execution | Phase 5 |
 | **7** | **Tests Module** | Stored Quizzes (MCQ/TF), Sandboxed Code Exercises, AI Reflections | Phase 6 |
 | **8** | **Compare Alternatives** | Multi-tech comparison, Trade-off matrix, What-If presets | Phase 5 |
 | **9** | **Progress & Bookmarks** | User progress tracking, bookmarking system, dashboard state | Phase 7, 8 |
@@ -43,12 +43,12 @@ This document outlines the sequential phases (0 through 10) for building **Codar
 - **Tasks:**
   1. Setup `server/` with Express, `cors`, `dotenv`, and native MongoDB driver.
   2. Implement `server/config/db.js` for MongoDB connection pool management.
-  3. Implement `GET /api/health` returning server status, MongoDB ping, and Judge0 reachability status.
+  3. Implement `GET /api/health` returning server status, MongoDB ping, and Docker runner availability.
   4. Scaffold `client/` using Vite + React with clean vanilla CSS tokens (`client/src/index.css`).
   5. Verify proxy configuration in `vite.config.js` connecting `client` to `server`.
 - **Acceptance Criteria:**
   - [ ] Running `npm start` in `server/` connects to `mongodb://localhost:27017/codara`.
-  - [ ] `GET /api/health` returns HTTP 200 with `{ status: "ok", mongo: "connected", judge0: "reachable" | "offline" }`.
+  - [x] `GET /api/health` reports MongoDB status and Docker runner availability (`dockerRunner: "ready" | "offline"`).
   - [ ] Running `npm run dev` in `client/` displays the initial Codara application shell.
   - [ ] Client successfully fetches and displays health status from backend.
 
@@ -134,15 +134,14 @@ This document outlines the sequential phases (0 through 10) for building **Codar
 ## Phase 6: Code Sandbox & Hardened Docker Runner
 - **Goal:** Implement an isolated, throwaway Docker-based code execution runner (`python:3.12-slim`, `node:22-slim`) behind the unified runner interface, embed Monaco Editor, and enforce read-only badges for daemon services.
 - **Tasks:**
-  1. Implement `server/services/dockerRunner.service.js` with pure argument array builder, wall-clock timeout (5s), output truncation (64KB), SHA-256 caching, and concurrency semaphore (max 2).
+  1. Implement `server/services/dockerRunner.service.js` with a pure argument-array builder, runtime-only timeout (5s), output truncation (64KB), SHA-256 caching, and concurrency semaphore (max 2). Queue waiting and container startup must not consume the user-code timeout.
   2. Implement hardened container security: `--rm --network none --memory 128m --memory-swap 128m --cpus 0.5 --pids-limit 64 --read-only --tmpfs /tmp:rw,size=16m --cap-drop ALL --security-opt no-new-privileges --user 1000:1000`.
   3. Mount code read-only under gitignored `d:\codara\.runs\<runId>` with automatic cleanup and fallback to `docker create` + `docker cp` + `docker start`.
   4. Implement `server/config/runner.config.js` storing non-secret defaults.
   5. Update `server/services/sandbox.service.js` and `POST /api/sandbox/execute` adapting `runCode` to the existing application contract.
   6. Enforce Rule 7: Python and JavaScript are editable and executable; Redis examples are rendered read-only with explicit server daemon requirement badges.
 - **Acceptance Criteria:**
-  - [x] Python: executes `print(2 + 2)` -> accepted status with stdout `4`.
-  - [x] Node.js: executes `console.log(2 + 2)` -> accepted status with stdout `4`.
+  - [x] Python and Node.js examples execute in their Docker images with accepted status and expected stdout.
   - [x] Infinite loop terminates at timeout limit (5s default, 1.5s in test) with container cleanup.
   - [x] Syntax error maps deterministically to `compile_error`.
   - [x] Identical code executions return cached results in 0ms with zero Docker calls.
@@ -155,14 +154,14 @@ This document outlines the sequential phases (0 through 10) for building **Codar
 - **Tasks:**
   1. Seed initial quizzes and code exercises in `quizzes` and `code_exercises` collections.
   2. Implement `POST /api/tests/quizzes/submit` validating answers against stored keys (zero AI involved).
-  3. Implement `POST /api/tests/exercises/submit` running code in Judge0 against public and hidden test cases.
+  3. Implement `POST /api/tests/exercises/:slug/submit` running code in Docker against public and hidden test cases.
   4. Implement AI feedback endpoints:
      - On code failure: `POST /api/ai/feedback/failure` (AI explains error grounded in compiler stderr + reference solution).
      - On code success: `POST /api/ai/feedback/reflection` (AI asks follow-up: "Why did you choose this approach?").
   5. Build `client/src/pages/TestsPage.jsx` with quiz runner and split-screen code editor/test runner.
 - **Acceptance Criteria:**
   - [ ] Quizzes strictly graded by database answer keys.
-  - [ ] Code exercises run against both visible and hidden test cases in Judge0.
+  - [x] Code exercises run against both visible and hidden test cases in the Docker runner.
   - [ ] AI does not grade; AI generates targeted feedback only after test results are confirmed.
 
 ---
@@ -198,17 +197,17 @@ This document outlines the sequential phases (0 through 10) for building **Codar
 ## Phase 10: Evaluation & Benchmarking
 - **Goal:** Build an automated evaluation suite running 30 curated test queries (with vs. without RAG retrieval), outputting benchmark metrics to CSV/JSON, and provide complete setup documentation in `README.md`.
 - **Tasks:**
-  1. Create `scripts/evaluate_rag.js` containing 30 diverse pedagogical queries (factual, architectural, misconception-based).
+  1. Create `scripts/eval/cases.json` with 30 editable pedagogical cases and `scripts/eval/run-eval.js` to execute paired retrieval/no-retrieval runs.
   2. Run evaluation in two modes:
      - **Condition A (With RAG):** Local retrieval active, citations enforced.
      - **Condition B (Without RAG / Zero Context):** Baseline LLM response.
-  3. Measure retrieval latency, citation accuracy, and hallucination rate.
-  4. Output results to `eval_results.json` and `eval_results.csv`.
+  3. Measure schema validity, source citation resolution, provider/model, Docker example execution, and retrieval timing; leave accuracy scoring to the manual rubric.
+  4. Output completed results to `results/eval-<date>.json` and `.csv`; checkpoint incomplete runs without presenting them as completed results.
   5. Write comprehensive `README.md` with step-by-step setup, Docker instructions, environment variable keys, and troubleshooting tips.
 - **Acceptance Criteria:**
-- [ ] Evaluation script executes all 30 test cases without unhandled errors.
-  - [ ] Generates clean CSV and JSON reports comparing RAG vs. No-RAG metrics.
-  - [ ] `README.md` allows any examiner or student to set up and run the project from scratch.
+- [x] Evaluation harness supports resumable paired retrieval/no-retrieval runs with provider pinning and structured metrics.
+  - [ ] Full evaluation of all enabled cases completes and manual accuracy scores are reviewed.
+  - [x] `README.md` documents setup, Docker runner, seed scripts, tests, and evaluation.
 
 ---
 

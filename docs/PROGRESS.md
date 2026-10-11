@@ -34,12 +34,12 @@ This document tracks the verified status, execution tests, unverified items, and
 - **Status:** **Completed & Verified**
 - **What Was Verified:**
   - Express server bootstrapped with CORS, JSON body parser, and graceful MongoDB connection pooling (`server/config/db.js`).
-  - `GET /api/health` verified with automated test (`server/test/health.test.js`) returning HTTP 200 with MongoDB connected and Judge0 status reported.
+  - `GET /api/health` verified with automated test (`server/test/health.test.js`) returning HTTP 200 with MongoDB status and Docker runner availability reported.
   - Client scaffolded with Vite + React, Monaco Editor, React Flow, and Lucide icons.
   - Dark-mode design system with HSL variables, glassmorphic cards, and typography in `client/src/index.css`.
   - Vite reverse-proxy for `/api` to port 5000 verified. Production build (`npm run build`) succeeded in 1.71s.
 - **What Is Unverified:**
-  - Judge0 Docker daemon is offline (handled gracefully via the offline fallback).
+  - Docker runner availability depends on Docker Desktop and pre-pulled images; the health endpoint reports it separately from MongoDB.
 - **How to Run:**
   ```powershell
   # Test backend health check
@@ -178,7 +178,7 @@ This document tracks the verified status, execution tests, unverified items, and
     - Non-secret runner configuration centralized in `server/config/runner.config.js`.
   - Updated pre-flight script `server/check-env.js`:
     - Checks Docker daemon responsiveness and verifies presence of `python:3.12-slim` and `node:22-slim` without printing secrets.
-    - `JUDGE0_URL` made optional and unused.
+    - The legacy `JUDGE0_URL` setting is unused by the active runner.
   - Automated test suite verified (`npm test` in `server/`):
     - 12 unit tests and real integration tests in `server/test/dockerRunner.test.js`:
       - Argument array security flags verification
@@ -321,7 +321,7 @@ This document tracks the verified status, execution tests, unverified items, and
 ## Known Gaps & Items Flagged for Human Review
 1. **Pre-Seeded Content:** All initial descriptions, pitfalls, and setup instructions will bear `reviewStatus: "needs human review"`.
 2. **Official Documentation URLs & Licenses:** URLs and licenses must be verified against actual upstream documentation.
-3. **Judge0 CE Docker Container:** To be verified in Phase 6. Fallback interface is required if local Docker is offline.
+3. **Local Docker runner availability:** Requires Docker Desktop and the pre-pulled Python/Node images. The rare Windows volume-mount fallback path has not been triggered by tests.
 
 ---
 
@@ -330,3 +330,11 @@ This document tracks the verified status, execution tests, unverified items, and
 - **Verified:** Added `.github/copilot-instructions.md` covering Codara architecture, security boundaries, product rules, task verification/commit expectations, and concise final reporting. Initial full server suite: 27 tests passed, 0 failed.
 - **Unverified:** Whether future Copilot sessions consistently follow the new instructions cannot be verified in this task.
 - **Next step:** Review instruction effectiveness during future Codara tasks and revise only if needed.
+
+## Final Consistency Pass (2026-10-11)
+
+- **Verified:** Updated README setup/run/seed/test/evaluation instructions and aligned `PROJECT_SPEC.md`, `ARCHITECTURE.md`, `TASKS.md`, and `DESIGN_DECISIONS.md` with the hardened local Docker runner. Judge0 is documented only as an evaluated and rejected approach; it is not an active runner dependency. Added `docs/HANDOVER.md`.
+- **Verified:** `cd server; node --test` passed 40 tests, 0 failed, 0 skipped on the final run. `cd client; npm run build` passed. `node scripts/verify_code_snippets.js` passed both runnable catalog examples and all 7 seeded exercise cases; Redis was verified read-only.
+- **Observed:** The first full-suite attempt had a transient Docker runner-unavailable result for its first Python integration case (38/40 passed); the snippet verifier and subsequent full-suite run passed after Docker execution succeeded. No runner code was changed in this documentation pass.
+- **Unverified:** Full evaluation remains incomplete as described in Phase 10. Human review of seeded content, answer keys, source URLs/licenses, and evaluation cases/scores remains pending. Live browser walkthrough and real MongoDB persistence restart remain unverified.
+- **Next step:** Human review, complete the pinned-provider evaluation, and use `docs/HANDOVER.md` for setup/demo.

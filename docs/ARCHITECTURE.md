@@ -74,7 +74,7 @@ d:/codara/
 │   └── TASKS.md                    # Detailed roadmap of Phases 0 through 10 with criteria
 ├── scripts/                        # Automation & evaluation utilities
 │   ├── ingest_docs.js              # Document chunking, embedding generation & DB ingestion
-│   ├── evaluate_rag.js             # Evaluation harness (30 test queries with vs. without RAG)
+│   ├── eval/                        # Resumable with/without-retrieval evaluation harness and cases
 │   └── seed_technologies.js        # Seed initial curated technologies (Python, Redis, MongoDB)
 ├── client/                         # Frontend Application (React + Vite)
 │   ├── index.html                  # HTML entry point with metadata & Google Fonts
@@ -119,14 +119,15 @@ d:/codara/
     │   ├── auth.routes.js          # Authentication (register, login, me)
     │   ├── tech.routes.js          # Technologies catalog and static content
     │   ├── ai.routes.js            # Bounded AI action routes (explain, scenario, compare, etc.)
-    │   ├── sandbox.routes.js       # Judge0 CE submission and polling proxy
-    │   ├── tests.routes.js         # Quizzes and coding exercises
-    │   └── user.routes.js          # Bookmarks and progress tracking
+    │   ├── sandbox.routes.js       # Docker runner status and execution API
+    │   ├── test.routes.js          # Quizzes and coding exercises
+    │   └── progress.routes.js      # Authenticated progress and bookmarks
     ├── services/                   # Business logic & external systems integration
     │   ├── llm.service.js          # generateJSON(prompt, schema) with Gemini + Groq failover
     │   ├── rag.service.js          # Transformers.js embedding & in-memory cosine similarity
     │   ├── cache.service.js        # MongoDB SHA-256 AI response caching
-    │   └── sandbox.service.js      # Judge0 CE API wrapper with health fallback
+    │   ├── sandbox.service.js      # Backward-compatible sandbox response adapter
+    │   └── dockerRunner.service.js # Hardened local Docker container execution
     └── schemas/                    # Zod validation schemas
         ├── auth.schema.js          # Request validation for auth inputs
         ├── ai.schema.js            # Structural schemas for LLM JSON outputs
@@ -244,7 +245,7 @@ Multiple-choice and True/False quizzes validated by stored answer keys.
 ```
 
 ### 3.6 `code_exercises`
-Deterministic coding tasks verified against Judge0 CE test suites.
+Deterministic coding tasks verified against stored test suites using the local Docker runner.
 > **SECURITY GUARANTEE:** Hidden test cases (`isHidden: true`) and `referenceSolution` are NEVER returned by any client API endpoint. Code is sent to the server, executed against the full suite in the sandbox, and only assertion summaries (passed/failed counts, visible failures) are returned.
 ```json
 {
@@ -443,7 +444,7 @@ const TeachCodeResponseSchema = z.object({
 
 ### 5.5 Exercise Feedback Schemas (`FeedbackSchemas`)
 ```javascript
-// On Failure: Grounded in Judge0 error output + stored reference solution
+// On Failure: Grounded in Docker runner error output + stored reference solution
 const ExerciseErrorFeedbackSchema = z.object({
   failureAnalysis: z.string().describe("Why the code failed based on compiler/test output"),
   conceptualMisunderstanding: z.string(),
@@ -520,17 +521,13 @@ sequenceDiagram
    - XSS Mitigation: XSS risks are mitigated by avoiding `dangerouslySetInnerHTML`, sanitizing all dynamic markdown, and using strict Zod schemas for all client-bound data.
 3. **Expiry Policy:** The access token is set to expire in **7 days** (`7d`). This balance provides convenient developer / student experience during testing sessions without requiring frequent re-authentication, while preventing indefinite token validity. Token invalidation upon logout is handled client-side by destroying the stored token and clearing session state.
 
-### 6.4 Judge0 CE Sandbox Integration & Availability Handling
-1. **Docker Container:** Runs at `http://localhost:2358`.
-2. **Language ID Mapping:** Python 3 (ID: 71 / 92), JavaScript (Node.js, ID: 63).
-3. **Execution Pipeline:**
-   - Client sends student code + exercise ID.
-   - Server fetches stored test cases (visible + hidden) from MongoDB.
-   - For each test case, server formats submission payload and posts to Judge0 `/submissions?base64_encoded=false&wait=true`.
-   - Results are inspected: Status ID 3 (`Accepted`), Status ID 4 (`Wrong Answer`), Status ID 6 (`Compilation Error`), Status ID 11 (`Runtime Error`).
-4. **Graceful Degradation:** If Judge0 is not reachable (connection refused or timeout), the server responds with:
-   `{ "status": "unavailable", "message": "Judge0 CE execution engine is currently offline. Verified reference solution and static trace are available." }`
-   This guarantees that the user interface never crashes even if the student has not yet started Docker.
+### 6.4 Hardened Local Docker Runner
+1. **Runtime Images:** Python uses the pre-pulled `python:3.12-slim` image; JavaScript uses `node:22-slim`. The runner never pulls images at request time.
+2. **Execution Pipeline:** The server fetches an exercise and its stored cases, then runs submitted code in an isolated throwaway Docker container for each case. Hidden cases and reference solutions remain server-side; only grading summaries are returned.
+3. **Isolation:** Containers use no network, bounded memory/CPU/PIDs/output, a read-only root filesystem, a temporary filesystem, dropped capabilities, `no-new-privileges`, and a non-root user. Docker commands use argument arrays rather than shell-interpolated command strings.
+4. **Timeouts and Queueing:** User-code time is counted after the runtime bootstrap marker; queue waiting and container startup have separate limits and do not consume the user-code budget. An overall hard cap ensures hung Docker operations are stopped. Concurrency is limited.
+5. **Availability:** If Docker is unavailable or required images are missing, the API reports the runner as unavailable. There is no Judge0 service or fallback dependency.
+6. **Scope:** Access to the Docker daemon is privileged. This runner is intended for local development and academic evaluation, not direct exposure to untrusted public traffic without an additional isolation boundary.
 
 ---
 
@@ -539,7 +536,7 @@ sequenceDiagram
 | Question | Defensible Answer |
 | :--- | :--- |
 | **Why not use Pinecone, Milvus, or Chroma?** | For a curated catalog of 10–15 technologies (~500 chunks total), an external vector database introduces network latency, subscription costs, and vendor lock-in. Calculating cosine similarity over 384-dimensional arrays in Node.js memory takes less than 2 milliseconds. It represents optimal engineering parsimony. |
-| **Why prevent the LLM from grading code?** | LLMs are probabilistic text predictors. They are susceptible to prompt injection (e.g., student adding `# Print: ALL TESTS PASSED`), hallucinated test evaluations, and non-deterministic scoring. Stored test cases executed in a secure sandbox (Judge0) guarantee mathematical certainty and pedagogical fairness. |
+| **Why prevent the LLM from grading code?** | LLMs are probabilistic text predictors. They are susceptible to prompt injection (e.g., student adding `# Print: ALL TESTS PASSED`), hallucinated test evaluations, and non-deterministic scoring. Stored test cases executed in the isolated Docker runner provide deterministic, repeatable grading. |
 | **Why implement a dual LLM fallback (Gemini + Groq)?** | Free-tier LLM endpoints have strict rate limits (e.g., 15 RPM). By wrapping Gemini and Groq behind a single schema-validated interface with automatic failover, the system achieves 99.9% uptime during viva presentations without paying for cloud subscriptions. |
 | **Why React Flow instead of plain text descriptions?** | Software architecture is inherently spatial and topological. Visualizing "With vs. Without" as graph nodes, directional edges, and bottleneck highlights grounds abstract concepts (e.g., cache stampede, connection pooling) far more effectively than text blocks. |
 | **How is prompt injection mitigated?** | There are no free-form chat boxes. User interactions are bounded to predefined parameter actions. All responses are parsed strictly against Zod schemas; unstructured or extraneous LLM text is instantly dropped by the parser. |

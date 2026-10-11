@@ -15,10 +15,10 @@ Codara is a full-stack, pedagogical developer education platform designed to tea
 
 ## 2. Prerequisites & Installation
 
-- **Node.js:** v20+ or v22+
+- **Node.js:** v22 LTS (includes npm)
 - **MongoDB:** Local instance running at `mongodb://localhost:27017/codara`
 - **Docker Desktop:** Windows 11 with WSL2 engine active
-- **Pre-pulled Runner Images:**
+- **Docker runner images:** Pull once; the runner does not pull images at runtime.
   ```powershell
   docker pull python:3.12-slim
   docker pull node:22-slim
@@ -28,14 +28,7 @@ Codara is a full-stack, pedagogical developer education platform designed to tea
 
 ## 3. Environment Configuration
 
-All environment variables reside in `server/.env` (gitignored, never committed):
-```env
-PORT=5000
-MONGO_URI=mongodb://localhost:27017/codara
-JWT_SECRET=<32+ char secret>
-GEMINI_API_KEY=<Google Gemini API Key>
-GROQ_API_KEY=<Groq Cloud API Key>
-```
+Create `server/.env` locally (it is gitignored and must never be committed). Configure `PORT`, `MONGO_URI`, `JWT_SECRET` (at least 32 characters), `GEMINI_API_KEY`, and `GROQ_API_KEY`. Never paste secrets into source files or logs. The app uses configured LLM providers for bounded AI features; the pre-flight checker reports both provider configurations.
 
 Non-secret runner configuration resides in `server/config/runner.config.js` with default resource limits:
 - Memory: `128m` (swap: `128m`)
@@ -66,18 +59,20 @@ Progress is stored per authenticated user in MongoDB and remains available after
 
 Verify your environment without leaking keys or secrets:
 ```powershell
-cd server
+cd D:\codara\server
 node check-env.js
 ```
-Expected output:
+The checker reports whether MongoDB, configured LLM providers, Docker, and both runner images are available. It reports status only and does not print key values.
+
+### Seed local data
+
+With MongoDB running and `server/.env` configured, run from the repository root:
+```powershell
+node scripts/seed_technologies.js
+node scripts/seed_tests.js
+node scripts/ingest_docs.js
 ```
-OK   PORT - 5000
-OK   JWT_SECRET
-OK   MONGO_URI - connected
-OK   GEMINI_API_KEY - HTTP 200
-OK   GROQ_API_KEY - HTTP 200
-OK   DOCKER_RUNNER - daemon active, images pre-pulled (python & node)
-```
+These seed the technology catalog, quizzes, coding exercises, and embedded documentation chunks used for retrieval.
 
 ---
 
@@ -85,17 +80,18 @@ OK   DOCKER_RUNNER - daemon active, images pre-pulled (python & node)
 
 ### Backend:
 ```powershell
-cd server
+cd D:\codara\server
 npm start
 ```
-Starts Express server on `http://localhost:5000`.
+Starts Express on `http://localhost:5000`; startup connects to MongoDB and loads document chunks into memory.
 
 ### Frontend:
 ```powershell
-cd client
+cd D:\codara\client
 npm run dev
 ```
 Starts Vite development server on `http://localhost:5173`.
+Open the Vite URL, register an account, then log in. Keep the backend running in its own terminal; Vite proxies `/api` requests to it.
 
 ---
 
@@ -103,8 +99,8 @@ Starts Vite development server on `http://localhost:5173`.
 
 ### Server Automated Test Suite:
 ```powershell
-cd server
-npm test
+cd D:\codara\server
+node --test
 ```
 Executes all unit tests and real container integration tests (Python/Node execution, infinite loop timeouts, and syntax error classifications).
 
@@ -134,6 +130,8 @@ For a small smoke run, select only a few cases:
 node scripts/eval/run-eval.js --limit 2
 ```
 Optional arguments are `--case-ids id1,id2`, `--delay-ms N`, and `--provider gemini|groq`. Pin the same provider for every batch; a pinned provider never falls back, and each result records the answering provider/model. If a provider is unavailable or rate-limited, the harness prints setup/resume instructions and does not write final result reports. Successful mode results are checkpointed so a later run can resume; final JSON/CSV files are only written when all enabled cases finish.
+
+Before treating evaluation as a benchmark, replace placeholder cases, complete the pinned-provider run, and fill the manual accuracy scores using `results/rubric.md`.
 
 ## 7. Security Notice & Scope
 

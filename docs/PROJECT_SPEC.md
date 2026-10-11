@@ -22,7 +22,7 @@ Codara solves this by enforcing an opinionated learning workflow:
   - **Compare Alternatives:** Multi-technology architectural trade-off analysis with side-by-side node diagrams, trade-off matrices, and preset "What-If" architectural pivot buttons.
 - **Phase 3: Code & Validate (Deterministic Sandboxing):**
   - **Teach to Code:** Step-by-step interactive coding walkthroughs using the Monaco Editor.
-  - **Tests Module:** True/False, Multiple-Choice, and Coding Challenges. **The AI never grades or decides correctness.** Ground truth is decided 100% deterministically by stored answer keys and Docker-isolated Judge0 CE test runs (including hidden test cases). The AI is engaged solely as an explanatory and reflective tutor (explaining test failures or asking follow-up questions on design choices).
+  - **Tests Module:** True/False, Multiple-Choice, and Coding Challenges. **The AI never grades or decides correctness.** Ground truth is decided deterministically by stored answer keys and execution in hardened, throwaway Docker containers (including hidden test cases). The AI is engaged solely as an explanatory and reflective tutor (explaining test failures or asking follow-up questions on design choices).
 
 ---
 
@@ -35,8 +35,8 @@ Codara solves this by enforcing an opinionated learning workflow:
 | **Backend Stack** | **Node.js + Express** (`server/`), **MongoDB Native / Mongoose** (`mongodb://localhost:27017/codara`), **bcrypt** for password hashing, **jsonwebtoken (JWT)** for stateless authentication, **zod** for schema validation. |
 | **LLM Engine** | Dual-provider abstraction behind a single unified wrapper: `generateJSON(prompt, schema)` using **Google Gemini API** (primary) and **Groq Cloud API** (backup/fallback). Enforces zod schema validation, automatic retry with validation errors, automatic failover on rate limits/errors, and SHA-256 request hashing with MongoDB caching. |
 | **RAG / Embeddings** | **Transformers.js** (`@xenova/transformers`) running locally in Node.js executing `all-MiniLM-L6-v2` (384-dimensional dense vectors). Vectors stored directly in MongoDB chunks; cosine similarity calculated in-memory in Node.js without third-party vector databases. |
-| **Code Execution** | **Judge0 CE** self-hosted locally via Docker at `JUDGE0_URL` (`http://localhost:2358`). Wrapped behind an abstraction interface with graceful fallback handling when Docker/Judge0 is offline. |
-| **Security & Secrets** | Secrets loaded from `server/.env` (`PORT`, `MONGO_URI`, `JWT_SECRET`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `JUDGE0_URL`). Values are **never** logged, printed, or committed. `.env` is strictly `.gitignore`d. |
+| **Code Execution** | Local hardened Docker throwaway containers using pre-pulled `python:3.12-slim` and `node:22-slim` images. Execution is resource-limited and network-isolated; there is no Judge0 service dependency. |
+| **Security & Secrets** | Secrets are configured in the local, gitignored `server/.env` (`PORT`, `MONGO_URI`, `JWT_SECRET`, `GEMINI_API_KEY`, `GROQ_API_KEY`). Values are **never** logged, printed, or committed. |
 | **Operating Scope** | Strictly confined to `D:\codara` on Windows 11. |
 
 ---
@@ -45,7 +45,7 @@ Codara solves this by enforcing an opinionated learning workflow:
 
 1. **Deterministic Correctness Over Probabilistic Grading:**
    - Multiple-choice and true/false questions are checked against database-stored keys.
-   - Code submissions are compiled and executed against stored test suites (visible + hidden) in the Judge0 sandbox.
+   - Code submissions are compiled and executed against stored test suites (visible + hidden) in the isolated Docker runner.
    - The LLM is strictly prohibited from awarding points or judging correctness. It only receives execution results (stdout, stderr, exit code, diff) to offer pedagogical explanations.
 2. **Grounded Citations Only (Anti-Hallucination):**
    - AI outputs must strictly adhere to zod schemas.
@@ -61,7 +61,7 @@ Codara solves this by enforcing an opinionated learning workflow:
    - All static technology overviews, architectural notes, and common pitfalls are marked with `reviewStatus: "needs human review"` until manually verified.
    - Every static chunk must record `sourceName`, verified `sourceUrl`, and `license`. No simulated or fake URLs.
 6. **Sandbox Capability Awareness:**
-   - Technologies requiring complex daemons or stateful multi-node clusters (e.g., Redis server, MongoDB server) that cannot execute as standalone single-file scripts in Judge0 CE are explicitly designated as `runnableInSandbox: false`.
+   - Technologies requiring complex daemons or stateful multi-node clusters (e.g., Redis server, MongoDB server) that cannot execute as standalone single-file scripts in the current Docker runner are explicitly designated as `runnableInSandbox: false`.
    - Their examples are displayed as read-only verified snippets with client-side interactive mock/simulation or explanation.
 
 ---
@@ -83,7 +83,7 @@ flowchart TD
     E2 --> G[React Flow Architecture Graph]
     E3 --> H[Side-by-Side React Flow & Trade-off Matrix]
     E4 --> I[Monaco Editor + Guided Steps]
-    E5 --> J[Deterministic Validation: Stored Keys & Judge0 CE]
+    E5 --> J[Deterministic Validation: Stored Keys & Docker Runner]
     
     J --> K{Passed?}
     K -- No --> L[AI Explains Failure based on Error Output]
@@ -96,8 +96,8 @@ flowchart TD
 
 | Tech Slug | Name | Category | Primary Focus in Codara | Sandbox Execution |
 | :--- | :--- | :--- | :--- | :--- |
-| `python` | Python 3 | Core Programming & Scripting | Syntax, memory model, data structures, common errors | Supported (Judge0 Python 3) |
-| `javascript` | JavaScript (Node.js) | Dynamic Runtime & Scripting | Event loop, async/await, closures, prototypical inheritance | Supported (Judge0 Node.js) |
+| `python` | Python 3 | Core Programming & Scripting | Syntax, memory model, data structures, common errors | Supported (`python:3.12-slim` Docker image) |
+| `javascript` | JavaScript (Node.js) | Dynamic Runtime & Scripting | Event loop, async/await, closures, prototypical inheritance | Supported (`node:22-slim` Docker image) |
 | `redis` | Redis | In-Memory Data Store & Caching | Key-value caching, TTL, pub/sub, cache stampede prevention | Read-Only (Requires Server Daemon) |
 | *Later items* | *MongoDB, PostgreSQL, Docker, etc.* | *Databases & Infrastructure* | *Future expansion modules* | *According to runtime* |
 
