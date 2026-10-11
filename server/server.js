@@ -18,10 +18,12 @@ const authRoutes = require("./routes/auth.routes");
 const techRoutes = require("./routes/tech.routes");
 const aiRoutes = require("./routes/ai.routes");
 const sandboxRoutes = require("./routes/sandbox.routes");
+const testRoutes = require("./routes/test.routes");
 app.use("/api/auth", authRoutes);
 app.use("/api/technologies", techRoutes);
 app.use("/api/ai", aiRoutes);
 app.use("/api/sandbox", sandboxRoutes);
+app.use("/api/tests", testRoutes);
 
 // Pre-flight health check endpoint
 const { checkDockerHealth } = require("./services/sandbox.service");

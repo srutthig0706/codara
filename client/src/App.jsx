@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage';
 import CatalogPage from './pages/CatalogPage';
 import TechnologyPage from './pages/TechnologyPage';
 import ScenarioPage from './pages/ScenarioPage';
+import TestsPage from './pages/TestsPage';
 import ExplainModal from './components/ExplainModal';
 import { Server, Database, Cpu, RefreshCw, AlertCircle, ArrowRight } from 'lucide-react';
 
@@ -79,6 +80,13 @@ function MainApp() {
           <ScenarioPage
             techSlug={selectedTechSlug}
             onBack={() => setCurrentView('technology')}
+          />
+        )}
+
+        {currentView === 'tests' && (
+          <TestsPage
+            initialTechSlug={selectedTechSlug || 'python'}
+            onBack={handleBackToCatalog}
           />
         )}
       </main>
