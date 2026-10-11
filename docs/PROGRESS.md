@@ -6,8 +6,8 @@ This document tracks the verified status, execution tests, unverified items, and
 
 ## Overall Status Summary
 
-- **Current Active Phase:** Phase 10 (Evaluation)
-- **Last Verified Phase:** Phase 10 partial pinned-provider evaluation
+- **Current Active Phase:** Phase 10 (Evaluation; paused at provider rate limit)
+- **Last Verified Phase:** Phase 9 (Progress & Bookmarks implementation and automated tests)
 - **Git State:** Evaluation checkpoint is ignored and resumable; existing legacy evaluator files remain outside the Phase 10 deliverables.
 
 ---
@@ -270,10 +270,24 @@ This document tracks the verified status, execution tests, unverified items, and
 ---
 
 ### Phase 9: Progress & Bookmarks
-- **Status:** Pending Execution
-- **What Was Verified:** -
-- **What Is Unverified:** -
-- **How to Run:** -
+- **Status:** Implemented & Automated Tests Verified
+- **What Was Verified:**
+  - Added authenticated `/api/progress/dashboard`, section-view, bookmark, and unbookmark routes backed by `user_progress` and `user_bookmarks` MongoDB collections.
+  - Progress records explicit section views, submitted deterministic quiz results, exercises only when every public and hidden test passes, and successfully generated scenarios. Set-like events are deduplicated; scenario generation remains a separate count rather than a completion step.
+  - Progress is scoped to the JWT user id. The dashboard reports five section steps, quiz completion, catalog exercise passes, quiz best/last scores and attempts, scenario count, and technology bookmarks.
+  - Added progress/bookmark controls to technology pages and a Progress dashboard; updated API, product, and acceptance-criteria documentation.
+  - Focused progress tests passed: 3 tests, 0 failures. Full server suite passed: 40 tests, 0 failures, 0 skipped. Client production build passed.
+- **What Is Unverified:**
+  - Cross-session persistence has been exercised through the service and route tests using an in-memory Mongo-compatible mock, not a live MongoDB restart or browser logout/login session.
+  - Visual browser behavior and real-user navigation have not been manually tested.
+- **How to Run:**
+  ```powershell
+  cd server
+  node --test test/progress.test.js
+  node --test
+  cd ..\client
+  npm run build
+  ```
 
 ---
 

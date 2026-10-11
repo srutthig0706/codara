@@ -8,6 +8,7 @@ import TechnologyPage from './pages/TechnologyPage';
 import ScenarioPage from './pages/ScenarioPage';
 import ComparePage from './pages/ComparePage';
 import TestsPage from './pages/TestsPage';
+import ProgressPage from './pages/ProgressPage';
 import ExplainModal from './components/ExplainModal';
 import { Server, Database, Cpu, RefreshCw, AlertCircle, ArrowRight } from 'lucide-react';
 
@@ -96,6 +97,10 @@ function MainApp() {
             initialTechSlug={selectedTechSlug || 'python'}
             onBack={handleBackToCatalog}
           />
+        )}
+
+        {isAuthenticated && currentView === 'dashboard' && (
+          <ProgressPage onSelectTech={handleSelectTech} />
         )}
       </main>
 

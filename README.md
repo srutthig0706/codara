@@ -56,6 +56,12 @@ Authenticated users can open **Compare** from the navigation or a technology pag
 
 ---
 
+### Learning Progress & Bookmarks
+
+Progress is stored per authenticated user in MongoDB and remains available after logout and a later login. Codara records a technology section only when it is viewed, a quiz when it is submitted (including its deterministic score), an exercise only after all tests pass, and a scenario only after successful graph validation. The technology page shows progress and lets users bookmark/unbookmark the technology. The **Progress** dashboard shows per-technology completion steps, quiz best scores, passed exercises, generated scenario counts, and bookmarked technologies. Completion steps are the five technology sections, the quiz, and the catalog exercises for that technology. No streaks, badges, or leaderboards are used.
+
+---
+
 ## 4. Pre-Flight Verification
 
 Verify your environment without leaking keys or secrets:

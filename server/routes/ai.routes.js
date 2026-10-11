@@ -5,6 +5,7 @@ const { retrieveRelevantChunks } = require("../services/rag.service");
 const { generateJSON } = require("../services/llm.service");
 const { getDB } = require("../config/db");
 const { computeCacheKey, setCachedAIResponse } = require("../services/cache.service");
+const { recordScenarioGenerated } = require("../services/progress.service");
 const { 
   ExplainResponseSchema, 
   ScenarioResponseSchema, 
@@ -349,6 +350,14 @@ GRAPH GENERATION RULES:
 
     // Validate graph topology
     const graphValidation = validateScenarioGraph(result.data, techSlug);
+    if (!graphValidation.isValid) {
+      return res.status(502).json({
+        error: "The generated scenario failed graph validation.",
+        details: graphValidation.errors
+      });
+    }
+
+    await recordScenarioGenerated(getDB(), req.user.userId, techSlug);
 
     return res.status(200).json({
       scenario: result.data,

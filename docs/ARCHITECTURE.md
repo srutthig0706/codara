@@ -271,22 +271,27 @@ Tracks individual student mastery and pinned resources.
 // user_progress
 {
   "_id": "ObjectId",
-  "userId": "ObjectId(user_id)",
+  "userId": "JWT userId (string)",
   "techSlug": "python",
-  "completedQuizzes": ["q1", "q2"],
-  "completedExercises": ["ObjectId(exercise_id)"],
-  "lastVisitedAt": "2026-10-10T12:00:00Z"
+  "sectionsViewed": ["overview", "setup"],
+  "quizCompleted": true,
+  "quizBestScore": 100,
+  "quizLastScore": 80,
+  "quizAttempts": 2,
+  "exercisesPassed": ["py-palindrome-clean"],
+  "scenariosGenerated": 1,
+  "updatedAt": "2026-10-10T12:00:00Z"
 }
 
 // user_bookmarks
 {
   "_id": "ObjectId",
-  "userId": "ObjectId(user_id)",
-  "targetType": "technology",
-  "targetSlug": "redis",
+  "userId": "JWT userId (string)",
+  "techSlug": "redis",
   "createdAt": "2026-10-10T12:00:00Z"
 }
 ```
+Only successful, server-verified quiz submissions, fully passed exercises, valid generated scenarios, explicitly viewed technology sections, and user-requested technology bookmarks are recorded. Progress documents and bookmarks are scoped to the authenticated JWT user id; logging out does not remove them. The dashboard's completion steps consist of the five technology sections, one completed quiz, and each catalog exercise for that technology. Scenario counts are shown separately.
 
 ---
 
@@ -308,6 +313,10 @@ Tracks individual student mastery and pinned resources.
 | `POST` | `/api/sandbox/execute`| Protected | 30 req/15m | Submits code to isolated Docker runner and evaluates against test suite |
 | `GET` | `/api/tests/quizzes/:slug`| Protected | Standard | Fetches quiz questions (excluding answer keys) |
 | `POST` | `/api/tests/quizzes/submit`| Protected | Standard | Evaluates quiz against stored keys deterministically |
+| `GET` | `/api/progress/dashboard` | Protected | Standard | Returns per-technology progress and bookmarked technologies for the current user |
+| `POST` | `/api/progress/sections/:techSlug/:sectionId/view` | Protected | Standard | Records a supported technology section after it is viewed |
+| `PUT` | `/api/progress/bookmarks/:techSlug` | Protected | Standard | Bookmarks a catalog technology for the current user |
+| `DELETE` | `/api/progress/bookmarks/:techSlug` | Protected | Standard | Removes a catalog technology bookmark for the current user |
 | `GET` | `/api/tests/exercises/:slug`| Protected | Standard | Fetches coding exercises (excluding hidden test cases) |
 | `POST` | `/api/user/progress` | Protected | Standard | Record completed quiz/exercise |
 | `GET` | `/api/user/bookmarks` | Protected | Standard | Fetch user bookmarks |

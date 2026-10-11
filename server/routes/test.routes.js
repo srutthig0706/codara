@@ -11,6 +11,7 @@ const {
   ExerciseErrorFeedbackSchema,
   ExerciseSuccessFollowUpSchema
 } = require("../schemas/test.schema");
+const { recordQuizCompleted, recordExercisePassed } = require("../services/progress.service");
 
 const router = express.Router();
 
@@ -72,6 +73,7 @@ router.post("/quizzes/:slug/submit", authMiddleware, async (req, res) => {
     });
 
     const score = Math.round((correctCount / quiz.questions.length) * 100);
+    await recordQuizCompleted(db, req.user.userId, quiz.techSlug, score);
 
     return res.status(200).json({
       techSlug: quiz.techSlug,
@@ -83,6 +85,7 @@ router.post("/quizzes/:slug/submit", authMiddleware, async (req, res) => {
       results
     });
   } catch (err) {
+    console.error("[TESTS] Failed to grade quiz or record progress:", err.message);
     return res.status(500).json({ error: "Failed to grade quiz submission." });
   }
 });
@@ -248,6 +251,9 @@ router.post("/exercises/:slug/submit", authMiddleware, sandboxRateLimiter, async
     }
 
     const allPassed = passedCount === allTestCases.length;
+    if (allPassed) {
+      await recordExercisePassed(db, req.user.userId, exercise.techSlug, exercise.slug);
+    }
 
     return res.status(200).json({
       slug: exercise.slug,
@@ -258,6 +264,7 @@ router.post("/exercises/:slug/submit", authMiddleware, sandboxRateLimiter, async
       failedCase: firstFailedCase
     });
   } catch (err) {
+    console.error("[TESTS] Failed to grade exercise or record progress:", err.message);
     return res.status(500).json({ error: "Failed to grade coding submission." });
   }
 });

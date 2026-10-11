@@ -181,16 +181,17 @@ This document outlines the sequential phases (0 through 10) for building **Codar
 ---
 
 ## Phase 9: Progress Tracking & Bookmarks
-- **Goal:** Enable students to track topic completion and bookmark key concepts, scenarios, and exercises.
+- **Goal:** Persist real learning events and technology bookmarks by authenticated user, with a per-technology progress view and dashboard.
 - **Tasks:**
-  1. Implement `user_progress` and `user_bookmarks` models and API routes.
-  2. Update client state when quizzes/exercises are completed.
-  3. Add bookmark toggle buttons across technology pages and code exercises.
-  4. Build student dashboard view summarizing completed technologies, quiz scores, and pinned items.
+  1. Implement authenticated APIs backed by `user_progress` and `user_bookmarks`.
+  2. Record explicitly viewed technology sections, submitted quiz results, fully passed exercises, and successfully generated scenarios only.
+  3. Add technology bookmark/unbookmark controls and a per-technology progress view.
+  4. Build a dashboard showing progress steps, quiz scores, passed exercises, scenario counts, and bookmarks.
 - **Acceptance Criteria:**
-  - [ ] User progress persists in MongoDB across page reloads.
-  - [ ] Bookmarked items appear in the student's dashboard.
-  - [ ] Clean visual indicators for completed exercises and modules.
+  - [x] User progress persists in MongoDB by stable authenticated user id across page reloads and logout/login.
+  - [x] Bookmarked technologies appear in the student's dashboard and can be removed.
+  - [x] Progress is based on verified user actions; no streaks, badges, leaderboards, or inferred completions are recorded.
+  - [x] Dashboard provides clear completion counts and indicators for sections, quizzes, and passed exercises.
 
 ---
 

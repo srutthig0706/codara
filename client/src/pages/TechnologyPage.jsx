@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import ReviewBanner from '../components/ReviewBanner';
 import CodeEditor from '../components/CodeEditor';
@@ -16,7 +16,7 @@ export default function TechnologyPage({
   onTriggerTeachCode, 
   onTriggerTests 
 }) {
-  const { token } = useAuth();
+  const { token, isAuthenticated } = useAuth();
   const [tech, setTech] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -24,11 +24,26 @@ export default function TechnologyPage({
   const [editorCode, setEditorCode] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [executionResult, setExecutionResult] = useState(null);
+  const [learningProgress, setLearningProgress] = useState(null);
+  const [bookmarking, setBookmarking] = useState(false);
+  const [progressError, setProgressError] = useState(null);
+
+  const refreshLearningProgress = useCallback(async () => {
+    if (!token) return;
+    const response = await fetch('/api/progress/dashboard', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to load learning progress.');
+    setLearningProgress(data.technologies.find(item => item.slug === techSlug) || null);
+  }, [techSlug, token]);
 
   useEffect(() => {
     async function fetchTech() {
       setLoading(true);
       setError(null);
+      setTech(null);
+      setActiveTab('overview');
       try {
         const res = await fetch(`/api/technologies/${techSlug}`);
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -43,6 +58,44 @@ export default function TechnologyPage({
     }
     fetchTech();
   }, [techSlug]);
+
+  useEffect(() => {
+    if (!token || tech?.slug !== techSlug) return;
+    let cancelled = false;
+    async function recordViewedSection() {
+      try {
+        const response = await fetch(`/api/progress/sections/${techSlug}/${activeTab}/view`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Failed to record viewed section.');
+        if (!cancelled) await refreshLearningProgress();
+      } catch (eventError) {
+        if (!cancelled) setProgressError(eventError.message);
+      }
+    }
+    recordViewedSection();
+    return () => { cancelled = true; };
+  }, [activeTab, tech, techSlug, token, refreshLearningProgress]);
+
+  const handleToggleBookmark = async () => {
+    setBookmarking(true);
+    setProgressError(null);
+    try {
+      const response = await fetch(`/api/progress/bookmarks/${techSlug}`, {
+        method: learningProgress?.bookmarked ? 'DELETE' : 'PUT',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Failed to update bookmark.');
+      await refreshLearningProgress();
+    } catch (bookmarkError) {
+      setProgressError(bookmarkError.message);
+    } finally {
+      setBookmarking(false);
+    }
+  };
 
   const handleRunCode = async () => {
     if (!tech?.runnableInSandbox) return;
@@ -125,6 +178,25 @@ export default function TechnologyPage({
         <p style={{ fontSize: '1.15rem', color: 'var(--text-secondary)', maxWidth: '850px' }}>
           {tech.shortDescription}
         </p>
+        {isAuthenticated && learningProgress && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap', marginTop: '1rem' }}>
+            <span className="badge badge-primary">
+              Progress: {learningProgress.progress.completedSteps} of {learningProgress.progress.totalSteps} steps
+            </span>
+            <button className="btn btn-secondary btn-sm" onClick={handleToggleBookmark} disabled={bookmarking}>
+              <Bookmark size={14} fill={learningProgress.bookmarked ? 'currentColor' : 'none'} />
+              {bookmarking ? 'Saving…' : learningProgress.bookmarked ? 'Bookmarked' : 'Bookmark technology'}
+            </button>
+            {learningProgress.progress.scenariosGenerated > 0 && (
+              <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                {learningProgress.progress.scenariosGenerated} scenario{learningProgress.progress.scenariosGenerated === 1 ? '' : 's'} generated
+              </span>
+            )}
+          </div>
+        )}
+        {progressError && (
+          <p role="alert" style={{ color: 'var(--accent-rose)', marginTop: '0.75rem' }}>{progressError}</p>
+        )}
       </div>
 
       {/* Bounded AI Action Toolbar */}
