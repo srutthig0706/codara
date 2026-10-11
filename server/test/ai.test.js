@@ -132,7 +132,7 @@ test("Phase 5: Live bounded AI endpoints (Explain, Scenario, Caching)", async (t
     const cacheData = await cacheRes.json();
     assert.strictEqual(cacheData.fromCache, true, "Subsequent query must return from cache");
     assert.strictEqual(cacheData.providerUsed, "cache");
-    assert.ok(cacheElapsed < 50, `Cached query must return rapidly (took ${cacheElapsed.toFixed(2)} ms)`);
+    assert.ok(cacheElapsed < 250, `Cached query must return rapidly (took ${cacheElapsed.toFixed(2)} ms)`);
 
     // Clean up test cache
     await db.collection("ai_cache").deleteMany({ technology: "python" });

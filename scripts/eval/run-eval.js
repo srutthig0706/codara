@@ -11,7 +11,9 @@ const { runCode } = require("../../server/services/dockerRunner.service");
 const {
   ExplainResponseSchema,
   ScenarioResponseSchema,
-  validateScenarioGraph
+  CompareResponseSchema,
+  validateScenarioGraph,
+  validateCompareResponse
 } = require("../../server/schemas/ai.schema");
 
 const CASES_PATH = path.join(__dirname, "cases.json");
@@ -26,7 +28,8 @@ const RATE_LIMIT_INSTRUCTIONS = [
 
 const SCHEMAS = {
   explain: ExplainResponseSchema,
-  scenario: ScenarioResponseSchema
+  scenario: ScenarioResponseSchema,
+  compare: CompareResponseSchema
 };
 
 function parseArgs(args) {
@@ -113,10 +116,14 @@ function extractCodeBlocks(value, blocks = []) {
 
 function citationAssessment(citationMetrics, chunks) {
   const sources = citationMetrics?.sources || [];
-  const checks = sources.map(sourceUrl => {
-    const matchingChunks = chunks.filter(chunk => chunk.sourceUrl === sourceUrl);
+  const checks = sources.map(source => {
+    const matchingChunks = chunks.filter(chunk =>
+      typeof source === "string"
+        ? chunk.sourceUrl === source
+        : chunk.id === source.sourceId
+    );
     return {
-      sourceUrl,
+      source: typeof source === "string" ? source : source.sourceId,
       sourceIds: matchingChunks.map(chunk => chunk.id),
       existsInRetrievedChunks: matchingChunks.some(chunk => Boolean(chunk.id))
     };
@@ -171,7 +178,8 @@ function buildPrompt(item, chunks) {
   "keyTakeaway": "string",
   "citations": [{ "sourceName": "string", "sourceUrl": "valid URL", "relevance": "string" }]
 }`
-    : `{
+    : item.type === "scenario"
+      ? `{
   "scenarioTitle": "string",
   "contextDescription": "string",
   "withoutTech": {
@@ -187,21 +195,37 @@ function buildPrompt(item, chunks) {
     "edges": [{ "id": "string", "source": "node id", "target": "node id", "label": "string", "animated": false, "isFailingEdge": false }]
   },
   "citations": [{ "sourceName": "string", "sourceUrl": "valid URL", "relevance": "string" }]
+}`
+      : `{
+  "projectDescription": "string",
+  "whatIfPreset": "10x-users|beginner-team|offline-support|null",
+  "technologiesCompared": ["technology slug"],
+  "diagrams": [{ "techSlug": "slug", "evidenceStatus": "verified|insufficient", "evidenceNote": "string", "nodes": [], "edges": [] }],
+  "tradeoffMatrix": [{ "criterion": "string", "ratings": { "slug": { "easier": "string", "harder": "string", "breaks": "string" } } }],
+  "recommendedChoice": "selected slug or insufficient-evidence",
+  "recommendationReason": "string",
+  "sources": [{ "sourceId": "retrieved chunk id", "techSlug": "slug", "sourceName": "string", "sourceUrl": "valid URL", "relevance": "string" }]
 }`;
 
   const context = chunks.length
-    ? chunks.map((chunk, index) =>
-      `[Source ${index + 1}] (${chunk.sourceName} - ${chunk.sourceUrl})\nTitle: ${chunk.sectionTitle}\n${chunk.content}`
+    ? chunks.map(chunk =>
+      `[Source ID: ${chunk.id}] (${chunk.techSlug}: ${chunk.sourceName} - ${chunk.sourceUrl})\nTitle: ${chunk.sectionTitle}\n${chunk.content}`
     ).join("\n\n")
     : "No local documentation context was retrieved. Do not claim local sources.";
   const citationRule = chunks.length
-    ? `Only cite source URLs listed above: ${chunks.map(chunk => chunk.sourceUrl).join(", ")}.`
+    ? item.type === "compare"
+      ? `Only cite source ids listed above: ${chunks.map(chunk => chunk.id).join(", ")}.`
+      : `Only cite source URLs listed above: ${chunks.map(chunk => chunk.sourceUrl).join(", ")}.`
     : "Leave citations empty because no local sources were supplied.";
 
+  const compareRules = item.type === "compare"
+    ? `Return one diagram for each selected technology, with nodes and edges; edge endpoints must exist in that diagram. Include a tradeoffMatrix where each criterion has ratings keyed by technology slug, and each rating has easier, harder, and breaks strings. Cite sources by retrieved chunk id in a sources array. For a technology with no chunks, do not guess: return evidenceStatus "insufficient", a single technology-labelled node, no edges, and explicitly unavailable trade-offs.`
+    : null;
   const scenarioRules = item.type === "scenario"
     ? `Include at least 2 nodes and 1 edge in each graph. Every edge source and target must match a node id in its graph. The withTech graph must include a node representing ${item.technologies[0]}.`
     : "Explain the requested concept with pedagogical clarity.";
-  return `You are a technical educator. ${scenarioRules}
+  const requestRules = item.type === "compare" ? compareRules : scenarioRules;
+  return `You are a technical educator. ${requestRules}
 Respond to this ${item.type} request for ${item.technologies.join(" and ")}:
 ${item.input}
 
@@ -218,7 +242,7 @@ function getModeResultKey(caseId, mode) {
 }
 
 async function evaluateMode(item, mode, chunks, retrievalLatencyMs, provider) {
-  const technology = item.technologies[0];
+  const technology = item.type === "compare" ? item.technologies.join(",") : item.technologies[0];
   const schema = SCHEMAS[item.type];
   if (!schema) {
     throw new Error(`The ${item.type} route/schema is not implemented; keep ${item.id} disabled.`);
@@ -238,10 +262,22 @@ async function evaluateMode(item, mode, chunks, retrievalLatencyMs, provider) {
   const responseLatencyMs = Date.now() - startedAt;
   const parsed = schema.safeParse(generated.data);
   const citationResult = citationAssessment(generated.citationMetrics, chunks);
+  const citations = item.type === "compare"
+    ? citationAssessment({
+      producedCount: generated.data.sources.length,
+      sources: generated.data.sources.map(source => ({ sourceId: source.sourceId }))
+    }, chunks)
+    : citationResult;
   const codeExamples = await assessCodeExamples(generated.data, technology);
-  const graphValidation = item.type === "scenario" && parsed.success
+  const graphValidation = parsed.success && item.type === "scenario"
     ? validateScenarioGraph(generated.data, technology)
-    : null;
+    : parsed.success && item.type === "compare"
+      ? validateCompareResponse(
+        generated.data,
+        item.technologies.map(slug => ({ slug, name: slug })),
+        chunks
+      )
+      : null;
 
   return {
     mode,
@@ -250,7 +286,7 @@ async function evaluateMode(item, mode, chunks, retrievalLatencyMs, provider) {
     model: generated.modelUsed,
     schemaValid: parsed.success,
     graphValidation,
-    citations: citationResult,
+    citations,
     codeExamples,
     retrievedChunks: chunks.map(chunk => ({
       id: chunk.id,
@@ -322,7 +358,7 @@ async function runEvaluation(args = process.argv.slice(2)) {
   }
   if (selected.length === 0) throw new Error("No enabled evaluation cases were selected.");
   if (selected.some(item => !SCHEMAS[item.type])) {
-    throw new Error("A selected case has no implemented route/schema. Keep Compare cases disabled until Compare is implemented.");
+    throw new Error("A selected case has no implemented evaluation schema.");
   }
 
   const date = new Date().toISOString().slice(0, 10);
@@ -360,14 +396,16 @@ async function runEvaluation(args = process.argv.slice(2)) {
     for (const item of selected) {
       const technology = item.technologies[0];
       const retrievalStarted = Date.now();
-      const ragResult = await retrieveRelevantChunks({
-        query: item.input,
-        techSlug: technology,
-        topK: 3,
-        minScore: item.type === "scenario" ? 0.30 : 0.35
-      });
+      const technologyRetrievals = await Promise.all(item.technologies.map(techSlug =>
+        retrieveRelevantChunks({
+          query: item.input,
+          techSlug,
+          topK: 3,
+          minScore: item.type === "scenario" || item.type === "compare" ? 0.30 : 0.35
+        })
+      ));
       const retrievalLatencyMs = Date.now() - retrievalStarted;
-      const chunks = ragResult.results;
+      const chunks = technologyRetrievals.flatMap(ragResult => ragResult.results);
 
       for (const [mode, modeChunks] of [
         ["with_retrieval", chunks],

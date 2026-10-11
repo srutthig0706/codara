@@ -6,6 +6,7 @@ import RegisterPage from './pages/RegisterPage';
 import CatalogPage from './pages/CatalogPage';
 import TechnologyPage from './pages/TechnologyPage';
 import ScenarioPage from './pages/ScenarioPage';
+import ComparePage from './pages/ComparePage';
 import TestsPage from './pages/TestsPage';
 import ExplainModal from './components/ExplainModal';
 import { Server, Database, Cpu, RefreshCw, AlertCircle, ArrowRight } from 'lucide-react';
@@ -70,7 +71,10 @@ function MainApp() {
             onBack={handleBackToCatalog}
             onTriggerExplain={(tech) => setActiveModal({ action: 'explain', tech })}
             onTriggerScenario={(tech) => setCurrentView('scenario')}
-            onTriggerCompare={(tech) => setCurrentView('compare')}
+            onTriggerCompare={(tech) => {
+              setSelectedTechSlug(tech.slug);
+              setCurrentView('compare');
+            }}
             onTriggerTeachCode={(tech) => setCurrentView('teach_code')}
             onTriggerTests={(tech) => setCurrentView('tests')}
           />
@@ -81,6 +85,10 @@ function MainApp() {
             techSlug={selectedTechSlug}
             onBack={() => setCurrentView('technology')}
           />
+        )}
+
+        {currentView === 'compare' && (
+          <ComparePage initialTechSlugs={selectedTechSlug ? [selectedTechSlug] : []} />
         )}
 
         {currentView === 'tests' && (

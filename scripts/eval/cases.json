@@ -165,7 +165,7 @@
     "technologies": ["python", "javascript"],
     "input": "PLACEHOLDER: Compare how Python and JavaScript handle asynchronous I/O for a specified workload.",
     "expectedPoints": ["PLACEHOLDER: State a meaningful similarity or difference.", "PLACEHOLDER: Relate the trade-off to the workload."],
-    "enabled": false
+    "enabled": true
   },
   {
     "id": "python-compare-02",
@@ -173,7 +173,7 @@
     "technologies": ["python", "redis"],
     "input": "PLACEHOLDER: Compare a Python in-process data structure with a Redis data structure for a specified use case.",
     "expectedPoints": ["PLACEHOLDER: Compare locality, persistence, or sharing.", "PLACEHOLDER: State an operational trade-off."],
-    "enabled": false
+    "enabled": true
   },
   {
     "id": "python-compare-03",
@@ -181,7 +181,7 @@
     "technologies": ["python", "javascript"],
     "input": "PLACEHOLDER: Compare a Python and JavaScript execution model for a CPU-bound workload.",
     "expectedPoints": ["PLACEHOLDER: Accurately distinguish the execution models.", "PLACEHOLDER: Relate the difference to scaling choices."],
-    "enabled": false
+    "enabled": true
   },
   {
     "id": "javascript-compare-01",
@@ -189,7 +189,7 @@
     "technologies": ["javascript", "redis"],
     "input": "PLACEHOLDER: Compare in-process JavaScript state with Redis-backed shared state.",
     "expectedPoints": ["PLACEHOLDER: Compare scope and lifetime of state.", "PLACEHOLDER: Explain a consistency or availability trade-off."],
-    "enabled": false
+    "enabled": true
   },
   {
     "id": "javascript-compare-02",
@@ -197,7 +197,7 @@
     "technologies": ["javascript", "python"],
     "input": "PLACEHOLDER: Compare JavaScript promises with a Python asynchronous programming approach.",
     "expectedPoints": ["PLACEHOLDER: Compare scheduling or concurrency semantics.", "PLACEHOLDER: Identify a practical workload distinction."],
-    "enabled": false
+    "enabled": true
   },
   {
     "id": "javascript-compare-03",
@@ -205,7 +205,7 @@
     "technologies": ["javascript", "redis"],
     "input": "PLACEHOLDER: Compare an in-memory JavaScript cache with Redis for a multi-instance service.",
     "expectedPoints": ["PLACEHOLDER: Compare sharing and failure behavior.", "PLACEHOLDER: Explain a latency or operations trade-off."],
-    "enabled": false
+    "enabled": true
   },
   {
     "id": "redis-compare-01",
@@ -213,7 +213,7 @@
     "technologies": ["redis", "python"],
     "input": "PLACEHOLDER: Compare Redis pub/sub with an in-process Python event mechanism for durability.",
     "expectedPoints": ["PLACEHOLDER: Distinguish delivery and persistence guarantees.", "PLACEHOLDER: Recommend based on stated requirements."],
-    "enabled": false
+    "enabled": true
   },
   {
     "id": "redis-compare-02",
@@ -221,7 +221,7 @@
     "technologies": ["redis", "javascript"],
     "input": "PLACEHOLDER: Compare Redis persistence with process-local JavaScript state after a restart.",
     "expectedPoints": ["PLACEHOLDER: Distinguish persistence and recovery behavior.", "PLACEHOLDER: Describe a relevant durability trade-off."],
-    "enabled": false
+    "enabled": true
   },
   {
     "id": "redis-compare-03",
@@ -229,7 +229,7 @@
     "technologies": ["redis", "python"],
     "input": "PLACEHOLDER: Compare Redis and Python data structures for a shared leaderboard workload.",
     "expectedPoints": ["PLACEHOLDER: Compare supported operations or complexity.", "PLACEHOLDER: Relate the choice to sharing and scaling."],
-    "enabled": false
+    "enabled": true
   },
   {
     "id": "redis-compare-04",
@@ -237,6 +237,6 @@
     "technologies": ["redis", "javascript"],
     "input": "PLACEHOLDER: Compare Redis and a JavaScript in-memory cache under memory pressure.",
     "expectedPoints": ["PLACEHOLDER: Compare eviction or memory scope.", "PLACEHOLDER: Explain an operational consequence."],
-    "enabled": false
+    "enabled": true
   }
 ]

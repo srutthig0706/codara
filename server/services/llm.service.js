@@ -167,6 +167,7 @@ async function generateJSON({
   promptVersion = "v1",
   retrievedChunks = [],
   useCache = true,
+  groundCitations = true,
   provider = null
 }) {
   if (provider !== null && !["gemini", "groq"].includes(provider)) {
@@ -217,7 +218,9 @@ async function generateJSON({
 
   const citationMetrics = measureCitations(finalData, retrievedChunks);
   // 3. Enforce Grounded Citations
-  finalData = enforceCitations(finalData, retrievedChunks);
+  if (groundCitations) {
+    finalData = enforceCitations(finalData, retrievedChunks);
+  }
 
   // 4. Save to MongoDB Cache
   const citations = retrievedChunks.map(c => c.sourceUrl);

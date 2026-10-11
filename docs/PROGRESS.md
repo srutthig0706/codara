@@ -6,9 +6,9 @@ This document tracks the verified status, execution tests, unverified items, and
 
 ## Overall Status Summary
 
-- **Current Active Phase:** Phase 10 (Evaluation Scripts & README)
-- **Last Verified Phase:** Phase 10 evaluation harness smoke test and full server suite
-- **Git State:** Generated smoke results are ignored; existing legacy evaluator files remain outside the Phase 10 deliverables.
+- **Current Active Phase:** Phase 8 (Compare Alternatives)
+- **Last Verified Phase:** Phase 8 Compare API smoke test and server/client validation
+- **Git State:** Compare smoke output was not written to disk; existing legacy evaluator files remain outside the Phase 10 deliverables.
 
 ---
 
@@ -248,10 +248,24 @@ This document tracks the verified status, execution tests, unverified items, and
 ---
 
 ### Phase 8: Compare Alternatives
-- **Status:** Pending Execution
-- **What Was Verified:** -
-- **What Is Unverified:** -
-- **How to Run:** -
+- **Status:** Implemented & Smoke Verified
+- **What Was Verified:**
+  - Added authenticated, rate-limited `POST /api/ai/compare` with catalog validation, per-technology retrieval, versioned caching, bounded what-if presets, response-schema checks, graph integrity validation, and citations tied to retrieved chunk ids.
+  - Added the Compare page with 2–3 technology selection, a 300-character project description, rerunnable what-if presets, side-by-side React Flow diagrams, trade-off matrix, recommendation, and verified sources.
+  - Compare schema/route regression tests pass, including invalid cached-response retry and missing-source disclosure. All 10 Compare evaluation cases are enabled.
+  - One real Redis/JavaScript comparison returned HTTP 200 from Groq after Gemini quota exhaustion; both diagrams and all cited chunk ids passed graph/source validation. JavaScript retrieval was empty, so the response correctly marked the recommendation insufficient rather than guessing.
+  - Full server suite passed: 36 tests, 0 failures, 0 skipped. Client production build passed; client lint completed with existing warnings in unrelated files.
+- **What Is Unverified:**
+  - A grounded recommendation with retrieved chunks for every selected technology has not been observed in the real comparison smoke test.
+  - The full evaluation suite has not been run; placeholder evaluation wording remains.
+- **How to Run:**
+  ```powershell
+  cd server
+  node --test test/compare.test.js
+  cd ..\client
+  npm run lint
+  npm run build
+  ```
 
 ---
 
@@ -266,11 +280,11 @@ This document tracks the verified status, execution tests, unverified items, and
 ### Phase 10: Evaluation & Benchmarking
 - **Status:** Harness Implemented & Smoke Verified
 - **What Was Verified:**
-  - Added 30 editable cases (10 Explain, 10 Scenario, 10 Compare) across Python, JavaScript, and Redis. Compare cases are disabled until a Compare route exists.
+  - Added 30 editable cases (10 Explain, 10 Scenario, 10 Compare) across Python, JavaScript, and Redis. Compare cases are now enabled; wording and expected points remain editable placeholders.
   - Added paired retrieval/no-retrieval evaluation with resumable checkpoints, AI and Docker-cache opt-outs, provider pinning (`--provider gemini|groq`), provider/model recording, schema checks, raw citation-produced/resolved counts, and Docker example execution results.
   - The two-case smoke run completed both modes for an Explain and a Scenario case. Reports were renamed with the `smoke-` prefix and gitignored; they are not benchmark results for publication.
   - Runner diagnosis: three concurrent short Node.js programs initially all hit the 5-second timeout. With an extended diagnostic limit, Docker/interpreter startup was about 2.6-3.6 seconds and Node process uptime about 0.4-1.2 seconds; pre-Docker wait estimates also included health checks and queueing. The timeout now starts at a language-runtime bootstrap marker, with separate queue/startup caps.
-  - Focused Docker and evaluation/provider tests passed: 18 tests, 0 failures. Full server suite passed: 33 tests, 0 failures, 0 skipped.
+  - Focused Docker and evaluation/provider tests passed during Phase 10: 18 tests, 0 failures. The Phase 8 completion full server suite passed: 36 tests, 0 failures, 0 skipped.
 - **What Is Unverified:**
   - The full 30-case evaluation has intentionally not been run; case wording/expected points remain placeholders for human editing.
   - The rare Windows volume-mount fallback path was not triggered by the current Docker tests.

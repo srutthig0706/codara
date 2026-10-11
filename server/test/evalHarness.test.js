@@ -8,7 +8,7 @@ const {
   citationAssessment
 } = require("../../scripts/eval/run-eval");
 
-test("Evaluation case set contains the required enabled and disabled cases", () => {
+test("Evaluation case set contains the required enabled cases", () => {
   const casesPath = path.resolve(__dirname, "../../scripts/eval/cases.json");
   const cases = JSON.parse(fs.readFileSync(casesPath, "utf8"));
   validateCases(cases);
@@ -16,7 +16,7 @@ test("Evaluation case set contains the required enabled and disabled cases", () 
   assert.strictEqual(cases.filter(item => item.type === "explain").length, 10);
   assert.strictEqual(cases.filter(item => item.type === "scenario").length, 10);
   assert.strictEqual(cases.filter(item => item.type === "compare").length, 10);
-  assert.strictEqual(cases.filter(item => item.type === "compare" && item.enabled).length, 0);
+  assert.strictEqual(cases.filter(item => item.type === "compare" && item.enabled).length, 10);
 });
 
 test("Evaluation provider can be pinned and invalid choices are rejected", () => {

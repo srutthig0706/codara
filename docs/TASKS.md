@@ -170,13 +170,13 @@ This document outlines the sequential phases (0 through 10) for building **Codar
 ## Phase 8: Compare Alternatives
 - **Goal:** Implement multi-technology trade-off visualizer with side-by-side diagrams, comparison matrices, and preset "What-If" architectural pivot buttons.
 - **Tasks:**
-  1. Implement `POST /api/ai/compare` accepting 2–3 technology slugs and a project description.
-  2. Synthesize side-by-side React Flow graphs, structured trade-off criteria matrix, and preset what-if pivots.
-  3. Build `client/src/pages/ComparePage.jsx` allowing users to select technologies, enter a scenario, view the trade-off matrix, and click preset "What-If" buttons (e.g., "What if data must survive server restart?").
+  1. Implement authenticated, rate-limited `POST /api/ai/compare` accepting 2–3 catalog slugs, a project description of at most 300 characters, and an optional what-if preset.
+  2. Retrieve documentation per technology, synthesize side-by-side React Flow graphs and easier/harder/breaks trade-offs, and validate graph topology and source ids before caching.
+  3. Build `client/src/pages/ComparePage.jsx` with a technology multi-select, project description, rerunnable what-if buttons, side-by-side diagrams, trade-offs, and verified sources.
 - **Acceptance Criteria:**
-  - [ ] Compares selected technologies with clear architectural trade-offs.
-  - [ ] What-if buttons update the verdict dynamically.
-  - [ ] All outputs validated via `CompareResponseSchema`.
+  - [x] Compares selected technologies with clear architectural trade-offs and discloses when retrieved evidence is insufficient.
+  - [x] What-if buttons rerun the comparison under the selected preset.
+  - [x] All outputs validated via `CompareResponseSchema`, including graph edges and retrieved source ids.
 
 ---
 
@@ -217,4 +217,3 @@ The following features are architectural extensions identified for future work a
 2. **Misconception Tags on Quiz Options:** Diagnostic tagging on each distractor option to categorize the precise conceptual mistake a student makes.
 3. **Trust Badges:** Cryptographic or visual verifiability badges displayed on static content indicating exact commit hashes of upstream documentation.
 4. **In-App Evaluation Results Page:** A UI dashboard page displaying automated RAG benchmark metrics within the user interface.
-

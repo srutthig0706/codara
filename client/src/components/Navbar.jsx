@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { LogOut, BookOpen, Bookmark, User, LogIn, Award } from 'lucide-react';
+import { LogOut, BookOpen, Bookmark, User, LogIn, Award, GitCompare } from 'lucide-react';
 
 export default function Navbar({ currentView, onNavigate }) {
   const { user, isAuthenticated, logout } = useAuth();
@@ -31,6 +31,13 @@ export default function Navbar({ currentView, onNavigate }) {
             >
               <Award size={14} />
               Tests
+            </button>
+            <button
+              className={`btn btn-sm ${currentView === 'compare' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => onNavigate('compare')}
+            >
+              <GitCompare size={14} />
+              Compare
             </button>
             <button
               className={`btn btn-sm ${currentView === 'bookmarks' ? 'btn-primary' : 'btn-secondary'}`}

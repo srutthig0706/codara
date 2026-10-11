@@ -381,23 +381,36 @@ const ScenarioResponseSchema = z.object({
 ```javascript
 const CompareResponseSchema = z.object({
   projectDescription: z.string(),
+  whatIfPreset: z.enum(["10x-users", "beginner-team", "offline-support"]).nullable(),
   technologiesCompared: z.array(z.string()).min(2).max(3),
+  diagrams: z.array(z.object({
+    techSlug: z.string(),
+    evidenceStatus: z.enum(["verified", "insufficient"]),
+    evidenceNote: z.string(),
+    nodes: z.array(FlowNodeSchema).min(1),
+    edges: z.array(FlowEdgeSchema)
+  })),
   tradeoffMatrix: z.array(z.object({
     criterion: z.string().describe("e.g., Read Latency, Data Durability, Operational Complexity"),
-    ratings: z.record(z.string(), z.string()).describe("Map of techSlug to evaluation string")
+    ratings: z.record(z.string(), z.object({
+      easier: z.string(),
+      harder: z.string(),
+      breaks: z.string()
+    })).describe("Map of techSlug to the easier, harder, and broken aspects")
   })),
-  recommendedChoice: z.string(),
+  recommendedChoice: z.string().describe("Selected technology slug, or insufficient-evidence"),
   recommendationReason: z.string(),
-  presetWhatIfs: z.array(z.object({
-    buttonLabel: z.string().describe("e.g., What if traffic spikes 100x?"),
-    resultingVerdict: z.string().describe("How the recommendation changes under this condition")
-  })).min(2),
-  citations: z.array(z.object({
+  sources: z.array(z.object({
+    sourceId: z.string().describe("Must match a retrieved documentation chunk id"),
+    techSlug: z.string(),
     sourceName: z.string(),
-    sourceUrl: z.string().url()
+    sourceUrl: z.string().url(),
+    relevance: z.string().optional()
   }))
 });
 ```
+
+`POST /api/ai/compare` accepts 2–3 unique catalog slugs, a project description of at most 300 characters, and an optional `whatIfPreset` (`10x-users`, `beginner-team`, or `offline-support`). The authenticated, rate-limited route retrieves documentation independently for each technology and caches validated responses with a versioned cache key. Graph edges and source ids are checked against the generated node ids and retrieved chunk ids. When a technology has no relevant chunk, its diagram is explicitly marked insufficient and contains no guessed connections; trade-offs and recommendations disclose the evidence gap.
 
 ### 5.4 Teach-to-Code Schema (`TeachCodeResponseSchema`)
 ```javascript

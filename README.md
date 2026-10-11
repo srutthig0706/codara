@@ -50,6 +50,12 @@ The user-code timeout starts after the interpreter bootstrap marker, so Docker/i
 
 ---
 
+### Compare Alternatives
+
+Authenticated users can open **Compare** from the navigation or a technology page. Select two or three catalog technologies, describe the project (up to 300 characters), and run the comparison. The result includes a side-by-side React Flow diagram for each technology, an easier/harder/breaks trade-off table, a recommendation, and retrieved-source links. The **10x users**, **Beginner team**, and **Offline support** preset buttons rerun the comparison under that constraint. When documentation retrieval returns no relevant source for a technology, the page explicitly marks its evidence as insufficient rather than inventing architecture or trade-offs.
+
+---
+
 ## 4. Pre-Flight Verification
 
 Verify your environment without leaking keys or secrets:
@@ -106,7 +112,7 @@ Runs all catalog examples and seeded code exercises against the real Docker runn
 
 ### AI Evaluation Harness
 
-The evaluation harness runs each enabled case once with local documentation retrieval and once with zero retrieved context. It calls the same server-side RAG, schema-validated LLM, and Docker code-runner services as the application; the AI response cache is disabled for evaluation. Compare cases remain disabled until a Compare route and response schema are implemented.
+The evaluation harness runs each enabled case once with local documentation retrieval and once with zero retrieved context. It calls the same server-side RAG, schema-validated LLM, and Docker code-runner services as the application; the AI response cache is disabled for evaluation. Compare cases are enabled now that the Compare route and response schema are implemented; replace their placeholder wording before treating them as an evaluation benchmark.
 
 1. Configure `server/.env` with at least one working provider key (`GEMINI_API_KEY` or `GROQ_API_KEY`), MongoDB, and the required local documentation chunks. Ensure Docker Desktop is running and the Python/Node runner images are available if generated code examples should be executed.
 2. Edit `scripts/eval/cases.json` to replace the `PLACEHOLDER` inputs and expected points. Use `enabled: false` to skip any case.
