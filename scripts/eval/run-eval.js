@@ -20,24 +20,21 @@ let runCode;
 let SCHEMAS;
 let validateScenarioGraph;
 let validateCompareResponse;
+let MODEL_OUTPUT_INVALID;
 
 function loadEvaluationServices() {
   ({ connectDB, closeDB } = require("../../server/config/db"));
   ({ retrieveRelevantChunks, loadChunksIntoMemory } = require("../../server/services/rag.service"));
-  ({ generateJSON } = require("../../server/services/llm.service"));
+  ({ generateJSON, MODEL_OUTPUT_INVALID } = require("../../server/services/llm.service"));
   ({ runCode } = require("../../server/services/dockerRunner.service"));
-  const {
-    ExplainResponseSchema,
-    ScenarioResponseSchema,
-    CompareResponseSchema,
-    validateScenarioGraph,
-    validateCompareResponse
-  } = require("../../server/schemas/ai.schema");
+  const aiSchemas = require("../../server/schemas/ai.schema");
   SCHEMAS = {
-    explain: ExplainResponseSchema,
-    scenario: ScenarioResponseSchema,
-    compare: CompareResponseSchema
+    explain: aiSchemas.ExplainResponseSchema,
+    scenario: aiSchemas.ScenarioResponseSchema,
+    compare: aiSchemas.CompareResponseSchema
   };
+  validateScenarioGraph = aiSchemas.validateScenarioGraph;
+  validateCompareResponse = aiSchemas.validateCompareResponse;
 }
 
 function getCheckpointPath(provider) {
@@ -331,6 +328,21 @@ async function evaluateMode(item, mode, chunks, retrievalLatencyMs, provider) {
   };
 }
 
+async function evaluateModeForCheckpoint(item, mode, chunks, retrievalLatencyMs, provider) {
+  try {
+    return await evaluateMode(item, mode, chunks, retrievalLatencyMs, provider);
+  } catch (error) {
+    if (error.code !== MODEL_OUTPUT_INVALID) throw error;
+    return {
+      mode,
+      schemaValid: false,
+      error: String(error.message).slice(0, 500),
+      provider: error.providerUsed || provider,
+      model: error.modelUsed || null
+    };
+  }
+}
+
 function flattenReport(cases, recordsByKey) {
   const headers = [
     "id", "type", "technologies", "input",
@@ -347,13 +359,13 @@ function flattenReport(cases, recordsByKey) {
     return [
       item.id, item.type, item.technologies.join("|"), item.input,
       withRag?.provider ?? null, withRag?.model ?? null,
-      withRag?.schemaValid ?? null, withRag?.citations.allCitationSourcesRetrieved ?? null,
-      withRag?.citations.producedCount ?? null, withRag?.citations.resolvedCount ?? null,
-      withRag?.codeExamples.status ?? null, withRag?.responseLatencyMs ?? null,
+      withRag?.schemaValid ?? null, withRag?.citations?.allCitationSourcesRetrieved ?? null,
+      withRag?.citations?.producedCount ?? null, withRag?.citations?.resolvedCount ?? null,
+      withRag?.codeExamples?.status ?? null, withRag?.responseLatencyMs ?? null,
       withoutRag?.provider ?? null, withoutRag?.model ?? null,
-      withoutRag?.schemaValid ?? null, withoutRag?.citations.allCitationSourcesRetrieved ?? null,
-      withoutRag?.citations.producedCount ?? null, withoutRag?.citations.resolvedCount ?? null,
-      withoutRag?.codeExamples.status ?? null, withoutRag?.responseLatencyMs ?? null
+      withoutRag?.schemaValid ?? null, withoutRag?.citations?.allCitationSourcesRetrieved ?? null,
+      withoutRag?.citations?.producedCount ?? null, withoutRag?.citations?.resolvedCount ?? null,
+      withoutRag?.codeExamples?.status ?? null, withoutRag?.responseLatencyMs ?? null
     ];
   });
   return `${headers.join(",")}\n${rows.map(row => row.map(csvCell).join(",")).join("\n")}\n`;
@@ -459,7 +471,7 @@ async function runEvaluation(args = process.argv.slice(2)) {
         console.log(`[Run] ${item.id} (${mode})`);
         let result;
         try {
-          result = await evaluateMode(
+          result = await evaluateModeForCheckpoint(
             item,
             mode,
             modeChunks,
@@ -562,6 +574,10 @@ module.exports = {
   getCheckpointPath,
   loadCheckpoint,
   countCompletedCases,
+  loadEvaluationServices,
+  evaluateMode,
+  evaluateModeForCheckpoint,
+  flattenReport,
   extractCodeBlocks,
   citationAssessment,
   assessCodeExamples

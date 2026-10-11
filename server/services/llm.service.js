@@ -7,6 +7,14 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY;
 
 const GEMINI_MODEL = "gemini-3.8-flash";
 const GROQ_MODEL = "openai/gpt-oss-20b";
+const MODEL_OUTPUT_INVALID = "LLM_OUTPUT_INVALID";
+
+function markInvalidModelOutput(error) {
+  if (error instanceof SyntaxError || /json_validate_failed/i.test(error.message || "")) {
+    error.code = MODEL_OUTPUT_INVALID;
+  }
+  return error;
+}
 
 /**
  * Invokes Google Gemini API with JSON mode.
@@ -128,20 +136,31 @@ async function callAndValidate(provider, prompt, schema) {
     rawJson = await callProvider(prompt);
   } catch (error) {
     if (provider !== "groq" || !error.message.includes("json_validate_failed")) {
-      throw error;
+      throw markInvalidModelOutput(error);
     }
     console.warn(`[LLM] ${label} rejected the generated JSON format. Retrying once with stricter JSON-only instructions...`);
-    rawJson = await callProvider(`${prompt}\n\nSTRICT JSON RETRY: Return one complete JSON object only. Use double-quoted keys and string values, no comments, no trailing commas, and no markdown fences.`);
+    try {
+      rawJson = await callProvider(`${prompt}\n\nSTRICT JSON RETRY: Return one complete JSON object only. Use double-quoted keys and string values, no comments, no trailing commas, and no markdown fences.`);
+    } catch (retryError) {
+      throw markInvalidModelOutput(retryError);
+    }
   }
   const parsed = schema.safeParse(rawJson);
   if (parsed.success) return parsed.data;
 
   console.warn(`[LLM] ${label} schema validation failed. Retrying once with error trace...`);
   const retryPrompt = `${prompt}\n\nIMPORTANT: Your previous response failed validation with errors: ${JSON.stringify(parsed.error.flatten().fieldErrors)}. Output valid JSON conforming strictly to schema.`;
-  const retryJson = await callProvider(retryPrompt);
+  let retryJson;
+  try {
+    retryJson = await callProvider(retryPrompt);
+  } catch (retryError) {
+    throw markInvalidModelOutput(retryError);
+  }
   const retryParsed = schema.safeParse(retryJson);
   if (!retryParsed.success) {
-    throw new Error(`${label} schema retry failed: ${JSON.stringify(retryParsed.error.flatten().fieldErrors)}`);
+    const error = new Error(`${label} schema retry failed: ${JSON.stringify(retryParsed.error.flatten().fieldErrors)}`);
+    error.code = MODEL_OUTPUT_INVALID;
+    throw error;
   }
   return retryParsed.data;
 }
@@ -209,7 +228,11 @@ async function generateJSON({
     try {
       finalData = await callAndValidate(provider, prompt, schema);
     } catch (error) {
-      throw new Error(`Pinned LLM provider '${provider}' failed: ${error.message}`);
+      const wrappedError = new Error(`Pinned LLM provider '${provider}' failed: ${error.message}`, { cause: error });
+      wrappedError.code = error.code;
+      wrappedError.providerUsed = provider;
+      wrappedError.modelUsed = provider === "groq" ? GROQ_MODEL : GEMINI_MODEL;
+      throw wrappedError;
     }
   } else {
     try {
@@ -260,5 +283,6 @@ module.exports = {
   generateJSON,
   callGemini,
   callGroq,
-  enforceCitations
+  enforceCitations,
+  MODEL_OUTPUT_INVALID
 };

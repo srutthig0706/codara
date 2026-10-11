@@ -2,7 +2,7 @@ const express = require("express");
 const authMiddleware = require("../middleware/auth");
 const { aiRateLimiter } = require("../middleware/rateLimiter");
 const { retrieveRelevantChunks } = require("../services/rag.service");
-const { generateJSON } = require("../services/llm.service");
+const { generateJSON, MODEL_OUTPUT_INVALID } = require("../services/llm.service");
 const { getDB } = require("../config/db");
 const { computeCacheKey, setCachedAIResponse } = require("../services/cache.service");
 const { recordScenarioGenerated } = require("../services/progress.service");
@@ -28,7 +28,7 @@ function createCompareHandler({
   getDatabase = getDB,
   saveCache = setCachedAIResponse
 } = {}) {
-  return async (req, res) => {
+   return async (req, res) => {
     const request = CompareRequestSchema.safeParse(req.body);
     if (!request.success) {
       return res.status(400).json({
@@ -163,7 +163,7 @@ For a grounded recommendation, recommendedChoice must be one selected slug and r
           return {
             isValid: false,
             errors: [JSON.stringify(parsed.error.flatten().fieldErrors)]
-          };
+           };
         }
         result.data = parsed.data;
         return validateCompareResponse(result.data, technologies, retrievedChunks, validationContext);
@@ -222,6 +222,9 @@ For a grounded recommendation, recommendedChoice must be one selected slug and r
       });
     } catch (err) {
       console.error("[AI] Compare error:", err.message);
+      if (err.code === MODEL_OUTPUT_INVALID) {
+        return res.status(502).json({ error: "The AI comparison could not be validated. Please try again." });
+      }
       return res.status(500).json({ error: err.message || "Failed to generate comparison." });
     }
   };
@@ -295,8 +298,13 @@ INSTRUCTIONS:
   }
 });
 
-// POST /api/ai/scenario
-router.post("/scenario", async (req, res) => {
+function createScenarioHandler({
+  retrieveChunks = retrieveRelevantChunks,
+  generate = generateJSON,
+  getDatabase = getDB,
+  recordGenerated = recordScenarioGenerated
+} = {}) {
+ return async (req, res) => {
   try {
     const { techSlug, scenarioTopic } = req.body;
     if (!techSlug) {
@@ -306,7 +314,7 @@ router.post("/scenario", async (req, res) => {
     const topic = (scenarioTopic || `High concurrency throughput and bottlenecks with ${techSlug}`).trim();
 
     // 1. Retrieve documentation chunks
-    const ragResult = await retrieveRelevantChunks({
+    const ragResult = await retrieveChunks({
       query: topic,
       techSlug,
       topK: 3,
@@ -338,7 +346,7 @@ GRAPH GENERATION RULES:
 3. Every edge's source and target MUST correspond to a declared node id in that same graph.
 4. Return valid JSON strictly matching ScenarioResponseSchema.`;
 
-    const result = await generateJSON({
+    const result = await generate({
       prompt,
       schema: ScenarioResponseSchema,
       technology: techSlug,
@@ -357,7 +365,7 @@ GRAPH GENERATION RULES:
       });
     }
 
-    await recordScenarioGenerated(getDB(), req.user.userId, techSlug);
+    await recordGenerated(getDatabase(), req.user.userId, techSlug);
 
     return res.status(200).json({
       scenario: result.data,
@@ -368,12 +376,18 @@ GRAPH GENERATION RULES:
     });
   } catch (err) {
     console.error("[AI] Scenario error:", err.message);
+    if (err.code === MODEL_OUTPUT_INVALID) {
+      return res.status(502).json({ error: "The AI scenario could not be validated. Please try again." });
+    }
     return res.status(500).json({ error: err.message || "Failed to generate scenario." });
   }
-});
+ };
+}
 
 // POST /api/ai/compare
+router.post("/scenario", createScenarioHandler());
 router.post("/compare", createCompareHandler());
 
 module.exports = router;
 module.exports.createCompareHandler = createCompareHandler;
+module.exports.createScenarioHandler = createScenarioHandler;
