@@ -6,9 +6,9 @@ This document tracks the verified status, execution tests, unverified items, and
 
 ## Overall Status Summary
 
-- **Current Active Phase:** Phase 8 (Compare Alternatives)
-- **Last Verified Phase:** Phase 8 Compare API smoke test and server/client validation
-- **Git State:** Compare smoke output was not written to disk; existing legacy evaluator files remain outside the Phase 10 deliverables.
+- **Current Active Phase:** Phase 10 (Evaluation)
+- **Last Verified Phase:** Phase 10 partial pinned-provider evaluation
+- **Git State:** Evaluation checkpoint is ignored and resumable; existing legacy evaluator files remain outside the Phase 10 deliverables.
 
 ---
 
@@ -278,20 +278,26 @@ This document tracks the verified status, execution tests, unverified items, and
 ---
 
 ### Phase 10: Evaluation & Benchmarking
-- **Status:** Harness Implemented & Smoke Verified
+- **Status:** Evaluation Paused at Provider Rate Limit
 - **What Was Verified:**
   - Added 30 editable cases (10 Explain, 10 Scenario, 10 Compare) across Python, JavaScript, and Redis. Compare cases are now enabled; wording and expected points remain editable placeholders.
   - Added paired retrieval/no-retrieval evaluation with resumable checkpoints, AI and Docker-cache opt-outs, provider pinning (`--provider gemini|groq`), provider/model recording, schema checks, raw citation-produced/resolved counts, and Docker example execution results.
   - The two-case smoke run completed both modes for an Explain and a Scenario case. Reports were renamed with the `smoke-` prefix and gitignored; they are not benchmark results for publication.
+  - The full run is pinned to Groq and checkpointed: 11/30 cases completed (23/60 mode results); a Groq tokens-per-minute response stopped the next mode. The retry command and remaining batches are recorded in the task handoff.
+  - After adding same-provider retry for Groq JSON-format rejection and clean 429 checkpoint reporting, full server suite passed: 37 tests, 0 failures, 0 skipped.
   - Runner diagnosis: three concurrent short Node.js programs initially all hit the 5-second timeout. With an extended diagnostic limit, Docker/interpreter startup was about 2.6-3.6 seconds and Node process uptime about 0.4-1.2 seconds; pre-Docker wait estimates also included health checks and queueing. The timeout now starts at a language-runtime bootstrap marker, with separate queue/startup caps.
   - Focused Docker and evaluation/provider tests passed during Phase 10: 18 tests, 0 failures. The Phase 8 completion full server suite passed: 36 tests, 0 failures, 0 skipped.
 - **What Is Unverified:**
-  - The full 30-case evaluation has intentionally not been run; case wording/expected points remain placeholders for human editing.
+  - The full evaluation is paused by Groq's tokens-per-minute limit at 11/30 complete cases (23/60 mode results checkpointed); 19 complete cases and 37 mode results remain. Resume with the same pinned provider and the same batch selection.
+  - `results/summary.md` has not been generated because the evaluation is incomplete. Case wording/expected points remain placeholders for human editing.
   - The rare Windows volume-mount fallback path was not triggered by the current Docker tests.
 - **How to Run:**
   ```powershell
-  node scripts/eval/run-eval.js --limit 2
-  node scripts/eval/run-eval.js --provider groq
+  # Resume the interrupted batch, then run batches 3-5 in order.
+  node scripts/eval/run-eval.js --provider groq --case-ids redis-explain-01,redis-explain-02,redis-explain-03,redis-explain-04,python-scenario-01,python-scenario-02
+  node scripts/eval/run-eval.js --provider groq --case-ids python-scenario-03,javascript-scenario-01,javascript-scenario-02,javascript-scenario-03,javascript-scenario-04,redis-scenario-01
+  node scripts/eval/run-eval.js --provider groq --case-ids redis-scenario-02,redis-scenario-03,python-compare-01,python-compare-02,python-compare-03,javascript-compare-01
+  node scripts/eval/run-eval.js --provider groq --case-ids javascript-compare-02,javascript-compare-03,redis-compare-01,redis-compare-02,redis-compare-03,redis-compare-04
   cd server
   node --test
   ```

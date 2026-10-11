@@ -83,3 +83,46 @@ test("Pinned provider failure does not fall back to another provider", async () 
     global.fetch = originalFetch;
   }
 });
+
+test("Groq JSON-format rejection retries once on Groq with strict JSON instructions", async () => {
+  const originalFetch = global.fetch;
+  let requestCount = 0;
+  let retryPrompt = "";
+  global.fetch = async (url, options) => {
+    assert.ok(String(url).includes("api.groq.com"), "Retry must remain pinned to Groq");
+    requestCount++;
+    const body = JSON.parse(options.body);
+    if (requestCount === 1) {
+      return new Response(JSON.stringify({
+        error: {
+          message: "Failed to validate JSON. Please adjust your prompt.",
+          type: "invalid_request_error",
+          code: "json_validate_failed",
+          failed_generation: ""
+        }
+      }), { status: 400 });
+    }
+    retryPrompt = body.messages[1].content;
+    return new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({ answer: "Valid response.", citations: [] }) } }]
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  try {
+    const result = await generateJSON({
+      prompt: "Return the answer.",
+      schema: ResponseSchema,
+      technology: "test",
+      action: "compare-retry",
+      input: "strict JSON retry",
+      promptVersion: "unit-test",
+      useCache: false,
+      provider: "groq"
+    });
+    assert.strictEqual(result.data.answer, "Valid response.");
+    assert.strictEqual(requestCount, 2);
+    assert.match(retryPrompt, /STRICT JSON RETRY/);
+  } finally {
+    global.fetch = originalFetch;
+  }
+});

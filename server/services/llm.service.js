@@ -123,7 +123,16 @@ function enforceCitations(outputJson, retrievedChunks) {
 async function callAndValidate(provider, prompt, schema) {
   const callProvider = provider === "gemini" ? callGemini : callGroq;
   const label = provider === "gemini" ? "Gemini" : "Groq";
-  const rawJson = await callProvider(prompt);
+  let rawJson;
+  try {
+    rawJson = await callProvider(prompt);
+  } catch (error) {
+    if (provider !== "groq" || !error.message.includes("json_validate_failed")) {
+      throw error;
+    }
+    console.warn(`[LLM] ${label} rejected the generated JSON format. Retrying once with stricter JSON-only instructions...`);
+    rawJson = await callProvider(`${prompt}\n\nSTRICT JSON RETRY: Return one complete JSON object only. Use double-quoted keys and string values, no comments, no trailing commas, and no markdown fences.`);
+  }
   const parsed = schema.safeParse(rawJson);
   if (parsed.success) return parsed.data;
 

@@ -432,6 +432,26 @@ async function runEvaluation(args = process.argv.slice(2)) {
             console.error(`${error.message}\n\n${RATE_LIMIT_INSTRUCTIONS}`);
             return false;
           }
+          if (/HTTP 429|rate_limit_exceeded|RESOURCE_EXHAUSTED|quota exceeded|tokens per minute/i.test(error.message)) {
+            const completedCases = allCases.filter(enabledCase =>
+              enabledCase.enabled &&
+              recordsByKey[getModeResultKey(enabledCase.id, "with_retrieval")] &&
+              recordsByKey[getModeResultKey(enabledCase.id, "without_retrieval")]
+            ).length;
+            const resumeCommand = [
+              "node scripts/eval/run-eval.js",
+              `--provider ${options.provider || "groq"}`,
+              `--case-ids ${selected.map(selectedCase => selectedCase.id).join(",")}`
+            ].join(" ");
+            console.error(
+              `[Stopped] The pinned provider hit a quota/rate limit. ` +
+              `${completedCases}/${allCases.filter(enabledCase => enabledCase.enabled).length} enabled cases are complete; ` +
+              `${Object.keys(recordsByKey).length} mode result(s) are checkpointed.\n` +
+              `Partial results remain at ${partialPath}.\n` +
+              `Resume this batch with: ${resumeCommand}`
+            );
+            return false;
+          }
           throw error;
         }
         recordsByKey[key] = {
@@ -454,13 +474,21 @@ async function runEvaluation(args = process.argv.slice(2)) {
     if (db) await closeDB();
   }
 
-  const complete = selected.every(item =>
+  const enabledCases = allCases.filter(item => item.enabled);
+  const complete = enabledCases.every(item =>
     recordsByKey[getModeResultKey(item.id, "with_retrieval")] &&
     recordsByKey[getModeResultKey(item.id, "without_retrieval")]
   );
-  if (!complete) return false;
+  if (!complete) {
+    const completedCount = enabledCases.filter(item =>
+      recordsByKey[getModeResultKey(item.id, "with_retrieval")] &&
+      recordsByKey[getModeResultKey(item.id, "without_retrieval")]
+    ).length;
+    console.log(`[Checkpoint] ${completedCount}/${enabledCases.length} enabled cases complete; ${enabledCases.length - completedCount} remain. Partial results saved to ${partialPath}`);
+    return true;
+  }
 
-  const orderedResults = selected.map(item => ({
+  const orderedResults = enabledCases.map(item => ({
     ...item,
     withRetrieval: recordsByKey[getModeResultKey(item.id, "with_retrieval")].result,
     withoutRetrieval: recordsByKey[getModeResultKey(item.id, "without_retrieval")].result
@@ -471,7 +499,7 @@ async function runEvaluation(args = process.argv.slice(2)) {
     modes: ["with_retrieval", "without_retrieval"],
     cases: orderedResults
   };
-  const csv = flattenReport(selected, recordsByKey);
+  const csv = flattenReport(enabledCases, recordsByKey);
   fs.writeFileSync(jsonPath, JSON.stringify(report, null, 2));
   fs.writeFileSync(csvPath, csv);
   fs.rmSync(partialPath, { force: true });

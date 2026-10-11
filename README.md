@@ -121,13 +121,13 @@ The evaluation harness runs each enabled case once with local documentation retr
    node scripts/eval/run-eval.js
    ```
    The script evaluates all enabled cases, waits five seconds between LLM calls by default, and resumes from `results/.eval-<date>.partial.json` if interrupted.
-4. Find completed reports at `results/eval-<date>.json` and `results/eval-<date>.csv`. They include provider and model per result, schema validity, citations produced and citations resolved to retrieved chunk IDs for both modes, response/retrieval timings, and Docker execution outcomes for fenced Python or JavaScript code (the runner cache is bypassed during evaluation). A zero-citation response is not marked as grounded. Redis examples and responses without fenced code are marked as unsupported/not provided. Use `results/rubric.md` to score factual accuracy manually; the harness never invents manual scores.
+4. Find completed reports at `results/eval-<date>.json` and `results/eval-<date>.csv` after all enabled cases finish. They include provider and model per result, schema validity, citations produced and citations resolved to retrieved chunk IDs for both modes, response/retrieval timings, and Docker execution outcomes for fenced Python or JavaScript code (the runner cache is bypassed during evaluation). A zero-citation response is not marked as grounded. Redis examples and responses without fenced code are marked as unsupported/not provided. Use `results/rubric.md` to score factual accuracy manually; the harness never invents manual scores.
 
 For a small smoke run, select only a few cases:
 ```powershell
 node scripts/eval/run-eval.js --limit 2
 ```
-Optional arguments are `--case-ids id1,id2`, `--delay-ms N`, and `--provider gemini|groq`. Pin a provider when comparing runs; a pinned provider never falls back, and each result records the answering provider/model. If neither configured LLM provider is available, the harness prints setup instructions and does not write final result reports. Successful mode results are checkpointed so a later run can resume; final JSON/CSV files are only written when all selected cases finish.
+Optional arguments are `--case-ids id1,id2`, `--delay-ms N`, and `--provider gemini|groq`. Pin the same provider for every batch; a pinned provider never falls back, and each result records the answering provider/model. If a provider is unavailable or rate-limited, the harness prints setup/resume instructions and does not write final result reports. Successful mode results are checkpointed so a later run can resume; final JSON/CSV files are only written when all enabled cases finish.
 
 ## 7. Security Notice & Scope
 
