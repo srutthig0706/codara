@@ -131,18 +131,22 @@ This document outlines the sequential phases (0 through 10) for building **Codar
 
 ---
 
-## Phase 6: Judge0 CE & Code Sandbox
-- **Goal:** Integrate self-hosted Judge0 CE, embed Monaco Editor, and establish sandboxed execution with clear support labels.
+## Phase 6: Code Sandbox & Hardened Docker Runner
+- **Goal:** Implement an isolated, throwaway Docker-based code execution runner (`python:3.12-slim`, `node:22-slim`) behind the unified runner interface, embed Monaco Editor, and enforce read-only badges for daemon services.
 - **Tasks:**
-  1. Implement `server/services/sandbox.service.js` to communicate with `JUDGE0_URL` (`http://localhost:2358`).
-  2. Implement graceful degradation: detect if Judge0 is unreachable and return structured fallback messages without crashing.
-  3. Implement `POST /api/sandbox/execute` accepting student code and language ID.
-  4. Build `client/src/components/CodeEditor.jsx` integrating `@monaco-editor/react`.
-  5. Enforce Rule 7: Python examples are editable and executable; Redis/MongoDB examples are rendered read-only with explicit badges explaining the requirement for external daemons.
+  1. Implement `server/services/dockerRunner.service.js` with pure argument array builder, wall-clock timeout (5s), output truncation (64KB), SHA-256 caching, and concurrency semaphore (max 2).
+  2. Implement hardened container security: `--rm --network none --memory 128m --memory-swap 128m --cpus 0.5 --pids-limit 64 --read-only --tmpfs /tmp:rw,size=16m --cap-drop ALL --security-opt no-new-privileges --user 1000:1000`.
+  3. Mount code read-only under gitignored `d:\codara\.runs\<runId>` with automatic cleanup and fallback to `docker create` + `docker cp` + `docker start`.
+  4. Implement `server/config/runner.config.js` storing non-secret defaults.
+  5. Update `server/services/sandbox.service.js` and `POST /api/sandbox/execute` adapting `runCode` to the existing application contract.
+  6. Enforce Rule 7: Python and JavaScript are editable and executable; Redis examples are rendered read-only with explicit server daemon requirement badges.
 - **Acceptance Criteria:**
-  - [ ] Executable Python snippet sends code to Judge0 and returns stdout/stderr.
-  - [ ] If Judge0 is stopped, system displays clean notice: "Execution engine offline — offline reference code available".
-  - [ ] Read-only banner is prominent on non-executable technologies (Redis, MongoDB).
+  - [x] Python: executes `print(2 + 2)` -> accepted status with stdout `4`.
+  - [x] Node.js: executes `console.log(2 + 2)` -> accepted status with stdout `4`.
+  - [x] Infinite loop terminates at timeout limit (5s default, 1.5s in test) with container cleanup.
+  - [x] Syntax error maps deterministically to `compile_error`.
+  - [x] Identical code executions return cached results in 0ms with zero Docker calls.
+  - [x] Read-only banner is prominent on non-executable technologies (Redis).
 
 ---
 

@@ -6,9 +6,9 @@ This document tracks the verified status, execution tests, unverified items, and
 
 ## Overall Status Summary
 
-- **Current Active Phase:** Phase 1 (Project Skeleton)
-- **Last Verified Phase:** Phase 0 (Specifications & Architecture)
-- **Git State:** Clean, all secrets gitignored, no `.env` or `node_modules` committed.
+- **Current Active Phase:** Phase 7 (Tests Module)
+- **Last Verified Phase:** Phase 6 (Code Sandbox & Hardened Docker Runner)
+- **Git State:** Clean, all secrets gitignored, no `.env`, `.runs`, or `node_modules` committed.
 
 ---
 
@@ -163,28 +163,57 @@ This document tracks the verified status, execution tests, unverified items, and
 
 ---
 
-### Phase 6: Judge0 CE & Code Sandbox
-- **Status:** **Completed & Verified (Runner Active, Judge0 Container Pending)**
+### Phase 6: Code Sandbox & Hardened Docker Runner
+- **Status:** **Completed & Verified**
 - **What Was Verified:**
-  - Setup of Judge0 CE directory at `D:\codara\infra\judge0` (gitignored per instructions).
-  - Downloaded official Judge0 CE release v1.13.1, extracted `docker-compose.yml` and `judge0.conf`, and generated cryptographically random passwords for `REDIS_PASSWORD` and `POSTGRES_PASSWORD`.
-  - Implemented unified `CodeRunnerInterface` (`server/services/sandbox.service.js`) with health check detection for Judge0 CE container at `JUDGE0_URL` (`http://localhost:2358`).
-  - Active runner executes code with timeout limits (3.5s) and captured standard streams:
-    - Verified Python 3 execution (`print(2 + 2)` &rarr; `4`, status: Accepted).
-    - Verified JavaScript execution (`console.log(10 * 10)` &rarr; `100`, status: Accepted).
-    - Verified runtime error handling (`raise ValueError(...)` &rarr; status 11 Runtime Error with stderr trace).
-    - Verified read-only rejection for Redis daemon (`languageId: 999` &rarr; 400 Bad Request with read-only flag).
-  - Rate limiting via `sandboxRateLimiter` (`server/middleware/rateLimiter.js`).
-  - Monaco Editor component (`client/src/components/CodeEditor.jsx`) integrated with live output console, execution timer, and verified snippet badges.
-- **Judge0 Pending Note & Exact Error:**
-  - `Judge0 pending`: The local Docker Desktop Linux daemon could not be started in this headless Windows terminal session:
-    `failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.`
-  - The application automatically degrades gracefully: `activeRunner` reports `mock_runner` / local isolated runner, and code executes cleanly without breaking any feature. If the user starts Docker Desktop interactively, `server/services/sandbox.service.js` automatically connects to Judge0 at `http://localhost:2358`.
+  - Hardened Docker-based throwaway container runner implemented (`server/services/dockerRunner.service.js`):
+    - Arguments array execution with `child_process.spawn("docker", args)` (never shell strings, zero command interpolation).
+    - Hardened security flags: `--rm --network none --memory 128m --memory-swap 128m --cpus 0.5 --pids-limit 64 --read-only --tmpfs /tmp:rw,size=16m --cap-drop ALL --security-opt no-new-privileges --user 1000:1000`.
+    - Pre-pulled local images: `python:3.12-slim` and `node:22-slim` (never pulled at runtime).
+    - Code mounted read-only via ephemeral folder `d:\codara\.runs\<runId>` (gitignored, automatically unlinked in `finally`), with automatic fallback to `docker create` + `docker cp` + `docker start`.
+    - Wall-clock timeout (default 5.0s): executes `docker rm -f <container>` on expiry and returns `status: "timeout"`.
+    - Stream output capping: stdout and stderr capped at 64 KB with truncation notice.
+    - Concurrency semaphore limiting execution to 2 simultaneous containers with FIFO queueing.
+    - In-memory cryptographic SHA-256 caching for identical `(language + code + stdin)` queries returning in 0ms with zero Docker calls.
+    - Non-secret runner configuration centralized in `server/config/runner.config.js`.
+  - Updated pre-flight script `server/check-env.js`:
+    - Checks Docker daemon responsiveness and verifies presence of `python:3.12-slim` and `node:22-slim` without printing secrets.
+    - `JUDGE0_URL` made optional and unused.
+  - Automated test suite verified (`npm test` in `server/`):
+    - 12 unit tests and real integration tests in `server/test/dockerRunner.test.js`:
+      - Argument array security flags verification
+      - Output truncation at 64 KB
+      - Deterministic SHA-256 cache key computation
+      - Outcome classification (`accepted`, `timeout`, `compile_error`, `runtime_error`, `output_limit`)
+      - Python real container execution: `print(2+2)` -> `4`
+      - Node.js real container execution: `console.log(2+2)` -> `4`
+      - Infinite loop timeout (`while True: pass`) terminates at 1.5s limit
+      - Python syntax error (`def invalid(:`) maps to `compile_error`
+      - JavaScript syntax error (`const bad = ;`) maps to `compile_error`
+      - Cached execution returns in 0ms
+    - Full server test suite passing 19 of 19 tests.
+  - Live Code Snippets & Exercise Verification (`scripts/verify_code_snippets.js`):
+    - **Catalog Python:** `verified_passed` (1365ms, stdout: `Original: 120.0, After 15.0% discount: 102.0`)
+    - **Catalog JavaScript:** `verified_passed` (2214ms, stdout: `Initiating async operations... Completed requests: [ 101, 102 ]`)
+    - **Catalog Redis:** `read_only_verified` (`runnableInSandbox: false`, correctly flagged read-only)
+    - **Exercise `Valid Alphanumeric Palindrome` (Python):** 4/4 test cases passed (2 public, 2 hidden)
+    - **Exercise `Word Frequency Counter` (JavaScript):** 3/3 test cases passed (2 public, 1 hidden)
+- **Judge0 Evaluation & cgroup Limitation:**
+  - Judge0 CE (v1.13.1) was evaluated, but its sandbox relies on Linux cgroup v1. On Windows 11 with Docker Desktop/WSL2 (cgroup v2), Judge0 returns an internal fault: `No such file or directory @ rb_sysopen - /box/script.py`. Rather than attempting unsupported host kernel modifications, the backend was migrated to the hardened Docker throwaway runner. `infra/judge0` remains untouched and gitignored.
+- **What Is Unverified:**
+  - Phase 7 (Tests Module) integration with student submission workflow.
 - **How to Run:**
   ```powershell
-  # Run sandbox test suite
+  # Pre-flight environment check
   cd d:\codara\server
+  node check-env.js
+
+  # Run full test suite
   npm test
+
+  # Run end-to-end code snippet verification
+  cd d:\codara
+  node scripts/verify_code_snippets.js
   ```
 
 ---

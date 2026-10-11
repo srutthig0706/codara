@@ -5,7 +5,7 @@ This document specifies the non-negotiable operational and pedagogical rules gov
 ---
 
 ## Rule 1: Deterministic Truth Over AI Grading
-- **Ground Truth Authority:** Stored answer keys in MongoDB and sandbox execution results in Judge0 CE are the **sole arbiters** of whether a student's answer or code is correct.
+- **Ground Truth Authority:** Stored answer keys in MongoDB and sandbox execution results in the hardened Docker code runner are the **sole arbiters** of whether a student's answer or code is correct.
 - **Strict Prohibition on AI Grading:** The LLM is strictly forbidden from awarding scores, grading correctness, or marking answers as right or wrong.
 - **Role of the AI:** The LLM acts solely as an explanatory and reflective tutor. It receives the deterministic test results (e.g., standard output, error trace, failed assertions, execution diff) and stored reference solutions to personalize feedback, explain algorithmic errors, or challenge the student with reflection questions on design trade-offs.
 
@@ -48,21 +48,21 @@ This document specifies the non-negotiable operational and pedagogical rules gov
   - Questions and options are fetched from MongoDB (with answer keys withheld from the client).
   - Submissions are evaluated strictly against stored keys on the server.
 - **Code Exercises:**
-  - Evaluated by executing code in Judge0 CE against stored test suites, including **hidden test cases** never exposed to the client.
+  - Evaluated by executing code in the isolated Docker runner against stored test suites, including **hidden test cases** never exposed to the client.
   - **On Failure:** AI generates a grounded failure explanation referencing compiler/test output and the stored reference solution.
   - **On Success:** AI asks a reflective follow-up: *"Why did you choose this approach?"* comparing the student's submission against reference design patterns (feedback, not a grade).
 
 ---
 
 ## Rule 7: Sandbox Feasibility & Read-Only Fallbacks
-- **Feasibility Classification:** Technologies that cannot be executed as standalone scripts in standard Judge0 CE containers (e.g., Redis server daemon, MongoDB multi-node replica set) must be explicitly flagged with `runnableInSandbox: false`.
+- **Feasibility Classification:** Technologies that cannot be executed as standalone scripts in standard isolated containers (e.g., Redis server daemon, MongoDB multi-node replica set) must be explicitly flagged with `runnableInSandbox: false`.
 - **Read-Only Display:** For non-runnable technologies, code snippets must be rendered in Monaco in read-only mode, clearly labeled as `[Read-Only Example: Requires Local / Containerized Service]`, paired with structural explanations or client-side simulations.
 
 ---
 
 ## Rule 8: Environment Security & Development Protocol
-- **Secret Isolation:** Environment variables (`PORT`, `MONGO_URI`, `JWT_SECRET`, `GEMINI_API_KEY`, `GROQ_API_KEY`, `JUDGE0_URL`) must reside exclusively in `server/.env`.
-- **Zero Secret Exposure:** Keys and secret strings must **never** be logged to the console, printed to files, committed to git, or requested from the user. Only environment variable names may be referenced.
+- **Secret Isolation:** Environment variables (`PORT`, `MONGO_URI`, `JWT_SECRET`, `GEMINI_API_KEY`, `GROQ_API_KEY`) must reside exclusively in `server/.env`.
+- **Zero Secret Exposure:** Keys and secret strings must **never** be logged to the console, printed to files, committed to git, or requested from the user. Only environment variable names may be referenced. Runner settings reside in `server/config/runner.config.js` with non-secret defaults.
 - **Git Hygiene:** `server/.env` and `node_modules` must remain in `.gitignore`.
 - **Small Working Commits:** Make focused git commits after each working step.
 - **Explicit Permission:** Always ask before installing anything globally, deleting files, or running destructive commands.

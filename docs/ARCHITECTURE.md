@@ -25,7 +25,7 @@ graph TB
         subgraph Services ["Backend Core Services"]
             LLMWrapper["generateJSON(prompt, schema)"]
             RAGService["RAG Engine (Transformers.js all-MiniLM-L6-v2)"]
-            SandboxService["Judge0 CE Client Interface"]
+            SandboxService["Code Runner Interface (Docker Throwaway Containers)"]
             CacheService["MongoDB AI Cache (SHA-256)"]
         end
     end
@@ -38,7 +38,7 @@ graph TB
     subgraph External ["External / Container Engines"]
         GeminiAPI[Google Gemini API]
         GroqAPI[Groq API (Backup / Fallback)]
-        Judge0Docker[Judge0 CE Docker (http://localhost:2358)]
+        DockerRunner[Hardened Docker Container Runner (python:3.12-slim, node:22-slim)]
     end
 
     %% Interactions
@@ -55,7 +55,7 @@ graph TB
     
     RAGService --> LocalModels
     RAGService --> MongoDB
-    SandboxService --> Judge0Docker
+    SandboxService --> DockerRunner
     Router --> MongoDB
 ```
 
@@ -294,7 +294,7 @@ Tracks individual student mastery and pinned resources.
 
 | Method | Endpoint | Auth | Rate Limit | Purpose |
 | :--- | :--- | :--- | :--- | :--- |
-| `GET` | `/api/health` | Public | None | Check API status, MongoDB connection, & Judge0 availability |
+| `GET` | `/api/health` | Public | None | Check API status, MongoDB connection, & Docker runner availability |
 | `POST` | `/api/auth/register` | Public | 10 req/15m | Register new user account |
 | `POST` | `/api/auth/login` | Public | 10 req/15m | Authenticate credentials and issue JWT |
 | `GET` | `/api/auth/me` | Protected | Standard | Fetch current logged-in user profile |
@@ -305,7 +305,7 @@ Tracks individual student mastery and pinned resources.
 | `POST` | `/api/ai/compare` | Protected | 20 req/15m | Generates comparative diagrams, trade-off matrix & what-ifs |
 | `POST` | `/api/ai/teach-code` | Protected | 20 req/15m | Step-by-step interactive coding lesson |
 | `POST` | `/api/ai/feedback` | Protected | 20 req/15m | Explains failure or reviews design choices based on tests |
-| `POST` | `/api/sandbox/execute`| Protected | 30 req/15m | Submits code to Judge0 CE and evaluates against test suite |
+| `POST` | `/api/sandbox/execute`| Protected | 30 req/15m | Submits code to isolated Docker runner and evaluates against test suite |
 | `GET` | `/api/tests/quizzes/:slug`| Protected | Standard | Fetches quiz questions (excluding answer keys) |
 | `POST` | `/api/tests/quizzes/submit`| Protected | Standard | Evaluates quiz against stored keys deterministically |
 | `GET` | `/api/tests/exercises/:slug`| Protected | Standard | Fetches coding exercises (excluding hidden test cases) |

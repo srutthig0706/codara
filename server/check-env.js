@@ -1,12 +1,45 @@
 require("dotenv").config();
 const { MongoClient } = require("mongodb");
+const { spawn } = require("child_process");
+const runnerConfig = require("./config/runner.config");
 
 const placeholders = ["your_jwt_secret_key", "your_gemini_api_key", "your_groq_api_key"];
 const report = (name, ok, detail = "") =>
   console.log(`${ok ? "OK  " : "FAIL"} ${name}${detail ? " - " + detail : ""}`);
 
+async function checkDocker() {
+  return new Promise((resolve) => {
+    const versionProc = spawn("docker", ["version", "--format", "{{.Server.Version}}"]);
+    let verOut = "";
+    versionProc.stdout.on("data", (d) => { verOut += d.toString(); });
+    versionProc.on("close", (code) => {
+      if (code !== 0 || !verOut.trim()) {
+        return resolve({ ok: false, detail: "Docker daemon not responding" });
+      }
+
+      // Check images
+      const imgProc = spawn("docker", [
+        "image",
+        "inspect",
+        runnerConfig.PYTHON_IMAGE,
+        runnerConfig.NODE_IMAGE,
+        "--format",
+        "{{.RepoTags}}"
+      ]);
+      imgProc.on("close", (imgCode) => {
+        if (imgCode !== 0) {
+          return resolve({ ok: false, detail: "Images missing (python:3.12-slim / node:22-slim)" });
+        }
+        resolve({ ok: true, detail: "daemon active, images pre-pulled (python & node)" });
+      });
+      imgProc.on("error", (err) => resolve({ ok: false, detail: err.message }));
+    });
+    versionProc.on("error", (err) => resolve({ ok: false, detail: err.message }));
+  });
+}
+
 async function main() {
-  const { PORT, MONGO_URI, JWT_SECRET, GEMINI_API_KEY, GROQ_API_KEY, JUDGE0_URL } = process.env;
+  const { PORT, MONGO_URI, JWT_SECRET, GEMINI_API_KEY, GROQ_API_KEY } = process.env;
 
   report("PORT", !!PORT && !isNaN(Number(PORT)), PORT);
 
@@ -43,12 +76,8 @@ async function main() {
     report("GROQ_API_KEY", false, e.message);
   }
 
-  try {
-    const r = await fetch(`${JUDGE0_URL}/languages`);
-    report("JUDGE0_URL", r.ok, `HTTP ${r.status}`);
-  } catch (e) {
-    report("JUDGE0_URL", false, "not reachable (expected if Judge0 isn't set up yet)");
-  }
+  const dockerStatus = await checkDocker();
+  report("DOCKER_RUNNER", dockerStatus.ok, dockerStatus.detail);
 }
 
 main();

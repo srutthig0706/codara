@@ -77,3 +77,32 @@ Technologies are classified by runtime execution feasibility:
 
 ### Trade-Offs & Limitations
 - **No Live Mutation for Daemon Technologies:** Students cannot run arbitrary `SET` / `GET` commands against a live Redis cluster inside the web interface without provisioning dedicated multi-container sandbox infrastructure (which exceeds free resource constraints).
+
+---
+
+## 5. Local Docker Container Runner vs. Judge0 CE on Windows Docker Desktop
+
+### Context & Evaluated Approach
+Judge0 CE (v1.13.1) was evaluated as the primary code execution sandbox. However, Judge0's isolation architecture depends on Linux cgroup v1 to enforce process and memory isolation. On modern Windows 11 with Docker Desktop and WSL2, the Linux kernel uses cgroup v2 by default. Under cgroup v2, Judge0 fails with an internal isolation fault: `No such file or directory @ rb_sysopen - /box/script.py`. Fixing this would require global downgrading of WSL2 host configurations or unmaintainable cgroup v1 boot flags.
+
+### Architecture Choice: Local Docker Throwaway Containers
+Rather than depending on third-party SaaS APIs or attempting unsupported kernel downgrades, Codara implements an in-process, isolated Docker runner module behind the unified code runner interface:
+- **Throwaway Containers:** Every execution spawns a fresh throwaway container with an explicit argument array via `child_process.spawn('docker', args)` (never interpolated shell strings).
+- **Pre-Pulled Images:** Uses local `python:3.12-slim` and `node:22-slim`. Images are checked at startup and never pulled dynamically at runtime.
+- **Strict Hardened Flags:**
+  - `--rm`
+  - `--network none` (zero socket/network access)
+  - `--memory 128m --memory-swap 128m` (strict heap ceiling)
+  - `--cpus 0.5`
+  - `--pids-limit 64` (fork-bomb prevention)
+  - `--read-only` (read-only root filesystem)
+  - `--tmpfs /tmp:rw,size=16m` (ephemeral isolated scratch area)
+  - `--cap-drop ALL` (all Linux kernel capabilities dropped)
+  - `--security-opt no-new-privileges` (prevents privilege escalation)
+  - `--user 1000:1000` (non-root execution)
+- **Code & I/O Delivery:** Code is mounted read-only via an ephemeral host folder under `d:\codara\.runs\<runId>` (gitignored, deleted immediately in a `finally` block). If volume mounting encounters Docker Desktop path issues, the runner automatically falls back to `docker create` + `docker cp` + `docker start`. Standard input is piped directly via `stdin`.
+- **Concurrency & Caching:** Maximum 2 concurrent runs via a semaphore queue; identical requests (`SHA-256(language:code:stdin)`) return cached results in 0ms. Wall-clock timeout defaults to 5.0s, executing `docker rm -f <container>` on expiry. Standard streams are capped at 64 KB with truncation notices.
+
+### Critical Limitations & Security Scope
+- **Local / Demonstration Scope Only:** The Docker runner backend controls the host Docker daemon. Because access to the Docker socket allows container creation, **this runner is intended exclusively for local development and academic evaluation**. It must never be deployed to an unauthenticated public production server without a hypervisor-level isolation layer (such as AWS Firecracker, gVisor, or Cloudflare Workers).
+- **Startup Overhead:** Creating a throwaway Docker container on Windows Docker Desktop incurs a startup latency of ~1.2s to ~3.5s per execution compared to pre-warmed container pools.

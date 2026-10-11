@@ -24,28 +24,19 @@ app.use("/api/ai", aiRoutes);
 app.use("/api/sandbox", sandboxRoutes);
 
 // Pre-flight health check endpoint
+const { checkDockerHealth } = require("./services/sandbox.service");
+
 app.get("/api/health", async (req, res) => {
   const mongoOk = await pingDB();
-
-  let judge0Status = "offline";
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
-    const jRes = await fetch(`${JUDGE0_URL}/languages`, { signal: controller.signal });
-    clearTimeout(timeout);
-    if (jRes.ok) {
-      judge0Status = "reachable";
-    }
-  } catch (e) {
-    judge0Status = "offline";
-  }
+  const dockerOk = await checkDockerHealth();
 
   const allHealthy = mongoOk;
   return res.status(allHealthy ? 200 : 503).json({
     status: allHealthy ? "ok" : "degraded",
     server: "running",
     mongo: mongoOk ? "connected" : "disconnected",
-    judge0: judge0Status,
+    dockerRunner: dockerOk ? "ready" : "offline",
+    judge0: "offline",
     timestamp: new Date().toISOString()
   });
 });

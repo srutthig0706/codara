@@ -3,6 +3,7 @@ const authMiddleware = require("../middleware/auth");
 const { sandboxRateLimiter } = require("../middleware/rateLimiter");
 const { 
   SUPPORTED_LANGUAGES, 
+  checkDockerHealth,
   checkJudge0Health, 
   executeCode 
 } = require("../services/sandbox.service");
@@ -11,14 +12,15 @@ const router = express.Router();
 
 // GET /api/sandbox/status - check execution runner status and available languages
 router.get("/status", async (req, res) => {
-  const isJudge0Online = await checkJudge0Health();
+  const isDockerOnline = await checkDockerHealth();
   return res.status(200).json({
-    judge0Online: isJudge0Online,
-    activeRunner: isJudge0Online ? "judge0" : "mock_runner",
+    dockerOnline: isDockerOnline,
+    judge0Online: false,
+    activeRunner: isDockerOnline ? "docker" : "runner_unavailable",
     supportedLanguages: SUPPORTED_LANGUAGES,
-    note: isJudge0Online 
-      ? "Judge0 CE Docker container is running." 
-      : "Judge0 CE is offline. Local isolated runner is active for Python & Node.js."
+    note: isDockerOnline 
+      ? "Docker container runner is active (isolated throwaway containers)." 
+      : "Docker is offline or required runner images are missing."
   });
 });
 
