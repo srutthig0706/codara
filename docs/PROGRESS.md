@@ -297,19 +297,20 @@ This document tracks the verified status, execution tests, unverified items, and
   - Added 30 editable cases (10 Explain, 10 Scenario, 10 Compare) across Python, JavaScript, and Redis. Compare cases are now enabled; wording and expected points remain editable placeholders.
   - Added paired retrieval/no-retrieval evaluation with resumable checkpoints, AI and Docker-cache opt-outs, provider pinning (`--provider gemini|groq`), provider/model recording, schema checks, raw citation-produced/resolved counts, and Docker example execution results.
   - The two-case smoke run completed both modes for an Explain and a Scenario case. Reports were renamed with the `smoke-` prefix and gitignored; they are not benchmark results for publication.
-  - The full run is pinned to Groq and checkpointed: 11/30 cases completed (23/60 mode results); a Groq tokens-per-minute response stopped the next mode. The retry command and remaining batches are recorded in the task handoff.
+  - The full run is pinned to Groq and checkpointed: 13/30 cases completed (27/60 mode results); a Groq quota/rate-limit response stopped `javascript-scenario-01` without retrieval. The harness printed the exact resume command for the current batch.
+  - After resuming the checkpoint, the full server suite passed: 40 tests, 0 failures, 0 skipped.
   - After adding same-provider retry for Groq JSON-format rejection and clean 429 checkpoint reporting, full server suite passed: 37 tests, 0 failures, 0 skipped.
   - Runner diagnosis: three concurrent short Node.js programs initially all hit the 5-second timeout. With an extended diagnostic limit, Docker/interpreter startup was about 2.6-3.6 seconds and Node process uptime about 0.4-1.2 seconds; pre-Docker wait estimates also included health checks and queueing. The timeout now starts at a language-runtime bootstrap marker, with separate queue/startup caps.
   - Focused Docker and evaluation/provider tests passed during Phase 10: 18 tests, 0 failures. The Phase 8 completion full server suite passed: 36 tests, 0 failures, 0 skipped.
 - **What Is Unverified:**
-  - The full evaluation is paused by Groq's tokens-per-minute limit at 11/30 complete cases (23/60 mode results checkpointed); 19 complete cases and 37 mode results remain. Resume with the same pinned provider and the same batch selection.
+  - The full evaluation is paused by Groq's quota/rate limit at 13/30 complete cases (27/60 mode results checkpointed); 17 complete cases and 33 mode results remain. `javascript-scenario-01` has one mode result checkpointed. Resume with the same pinned provider and current batch selection.
   - `results/summary.md` has not been generated because the evaluation is incomplete. Case wording/expected points remain placeholders for human editing.
   - The rare Windows volume-mount fallback path was not triggered by the current Docker tests.
 - **How to Run:**
   ```powershell
-  # Resume the interrupted batch, then run batches 3-5 in order.
-  node scripts/eval/run-eval.js --provider groq --case-ids redis-explain-01,redis-explain-02,redis-explain-03,redis-explain-04,python-scenario-01,python-scenario-02
+  # Resume the current batch; completed modes are skipped from the checkpoint.
   node scripts/eval/run-eval.js --provider groq --case-ids python-scenario-03,javascript-scenario-01,javascript-scenario-02,javascript-scenario-03,javascript-scenario-04,redis-scenario-01
+  # Then continue with the remaining batches in order.
   node scripts/eval/run-eval.js --provider groq --case-ids redis-scenario-02,redis-scenario-03,python-compare-01,python-compare-02,python-compare-03,javascript-compare-01
   node scripts/eval/run-eval.js --provider groq --case-ids javascript-compare-02,javascript-compare-03,redis-compare-01,redis-compare-02,redis-compare-03,redis-compare-04
   cd server
