@@ -275,3 +275,11 @@ This document tracks the verified status, execution tests, unverified items, and
 1. **Pre-Seeded Content:** All initial descriptions, pitfalls, and setup instructions will bear `reviewStatus: "needs human review"`.
 2. **Official Documentation URLs & Licenses:** URLs and licenses must be verified against actual upstream documentation.
 3. **Judge0 CE Docker Container:** To be verified in Phase 6. Fallback interface is required if local Docker is offline.
+
+---
+
+## Copilot Instructions Update (2026-10-11)
+
+- **Verified:** Added `.github/copilot-instructions.md` covering Codara architecture, security boundaries, product rules, task verification/commit expectations, and concise final reporting. Full server suite (`cd server; node --test`): 27 tests passed, 0 failed.
+- **Unverified:** Whether future Copilot sessions consistently follow the new instructions cannot be verified in this task.
+- **Next step:** Review instruction effectiveness during future Codara tasks and revise only if needed.
