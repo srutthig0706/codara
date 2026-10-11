@@ -12,8 +12,20 @@ const {
   ExerciseSuccessFollowUpSchema
 } = require("../schemas/test.schema");
 const { recordQuizCompleted, recordExercisePassed } = require("../services/progress.service");
+const { isDeepStrictEqual } = require("node:util");
 
 const router = express.Router();
+
+function compareExerciseOutput(expected, actual, outputComparison) {
+  if (outputComparison !== "json") {
+    return String(expected).trim() === String(actual).trim();
+  }
+  try {
+    return isDeepStrictEqual(JSON.parse(String(expected)), JSON.parse(String(actual)));
+  } catch {
+    return false;
+  }
+}
 
 // GET /api/tests/quizzes/:slug - Get quiz questions with answer keys withheld
 router.get("/quizzes/:slug", authMiddleware, async (req, res) => {
@@ -169,7 +181,8 @@ router.post("/exercises/:slug/run", authMiddleware, sandboxRateLimiter, async (r
 
       const actualTrimmed = (runRes.stdout || "").trim();
       const expectedTrimmed = String(tc.expectedOutput).trim();
-      const passed = runRes.status === "accepted" && actualTrimmed === expectedTrimmed;
+      const passed = runRes.status === "accepted" &&
+        compareExerciseOutput(expectedTrimmed, actualTrimmed, exercise.outputComparison);
 
       testResults.push({
         testCaseIndex: i + 1,
@@ -223,7 +236,8 @@ router.post("/exercises/:slug/submit", authMiddleware, sandboxRateLimiter, async
 
       const actualTrimmed = (runRes.stdout || "").trim();
       const expectedTrimmed = String(tc.expectedOutput).trim();
-      const passed = runRes.status === "accepted" && actualTrimmed === expectedTrimmed;
+      const passed = runRes.status === "accepted" &&
+        compareExerciseOutput(expectedTrimmed, actualTrimmed, exercise.outputComparison);
 
       if (passed) {
         passedCount++;
@@ -248,6 +262,7 @@ router.post("/exercises/:slug/submit", authMiddleware, sandboxRateLimiter, async
         expectedOutput: tc.isHidden ? "[Hidden]" : expectedTrimmed,
         stderr: tc.isHidden ? (runRes.stderr ? "Runtime error occurred" : "") : runRes.stderr
       });
+
     }
 
     const allPassed = passedCount === allTestCases.length;
@@ -364,3 +379,4 @@ Return a strictly valid JSON object matching the schema:
 });
 
 module.exports = router;
+module.exports.compareExerciseOutput = compareExerciseOutput;

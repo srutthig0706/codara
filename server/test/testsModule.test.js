@@ -35,9 +35,10 @@ test("Phase 7: Tests Module (Quizzes, Exercises & Deterministic Grading)", async
     await t.test("POST /api/tests/quizzes/python/submit evaluates strictly against database keys", async () => {
       // Intentionally supply perfect answers
       const perfectAnswers = {
-        py_q1: 1, // mutable reference
+        py_q1: 0, // mutable reference
         py_q2: 1, // False
-        py_q3: 1  // LEGB rule
+        py_q3: 3, // LEGB rule
+        py_q4: 1  // bool is a subclass of int
       };
 
       const res = await fetch("http://localhost:5093/api/tests/quizzes/python/submit", {
@@ -53,7 +54,7 @@ test("Phase 7: Tests Module (Quizzes, Exercises & Deterministic Grading)", async
       const data = await res.json();
       assert.strictEqual(data.score, 100);
       assert.strictEqual(data.passed, true);
-      assert.strictEqual(data.correctCount, 3);
+      assert.strictEqual(data.correctCount, 4);
       assert.ok(data.results[0].explanation, "Explanations returned after submission");
     });
 

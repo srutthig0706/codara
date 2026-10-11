@@ -14,12 +14,12 @@ const quizzes = [
         type: "mcq",
         question: "What happens when a list is passed as an argument to a Python function and modified using .append()?",
         options: [
-          "Python raises an UnboundLocalError",
           "The caller's original list is modified in place because lists are mutable references",
+          "Python raises an UnboundLocalError",
           "Python creates an automatic deep copy of the list inside the function",
           "The list is converted to an immutable tuple"
         ],
-        correctAnswerIndex: 1,
+        correctAnswerIndex: 0,
         explanation: "Python passes arguments by object reference (assignment). Since lists are mutable objects, operations modifying the object in place directly affect the caller's instance."
       },
       {
@@ -39,12 +39,23 @@ const quizzes = [
         question: "What order does Python follow when resolving variable names?",
         options: [
           "Global -> Local -> Built-in -> Enclosing",
-          "Local -> Enclosing -> Global -> Built-in (LEGB rule)",
           "Built-in -> Global -> Enclosing -> Local",
-          "Local -> Global only"
+          "Local -> Global only",
+          "Local -> Enclosing -> Global -> Built-in (LEGB rule)"
+        ],
+        correctAnswerIndex: 3,
+        explanation: "Python resolves identifiers using the LEGB hierarchy: Local, Enclosing function scope, Global (module), and Built-in."
+      },
+      {
+        id: "py_q4",
+        type: "tf",
+        question: "True or False: In Python, bool is a subclass of int, so True and False behave like 1 and 0 in numeric contexts.",
+        options: [
+          "False",
+          "True"
         ],
         correctAnswerIndex: 1,
-        explanation: "Python resolves identifiers using the LEGB hierarchy: Local, Enclosing function scope, Global (module), and Built-in."
+        explanation: "True. Python's bool type is a subclass of int: True has the numeric value 1 and False has the numeric value 0, though they remain distinct boolean values."
       }
     ]
   },
@@ -55,15 +66,15 @@ const quizzes = [
       {
         id: "js_q1",
         type: "mcq",
-        question: "In what phase does Node.js execute Promise resolution callbacks (.then / await)?",
+        question: "When does Node.js run Promise callbacks (.then / await continuations)?",
         options: [
           "Timers phase of the event loop",
-          "Immediately in the microtask queue before moving to the next macrotask phase",
           "Check phase (setImmediate)",
+          "From the microtask queue, right after the current operation finishes and before the event loop moves on",
           "Operating system kernel thread pool"
         ],
-        correctAnswerIndex: 1,
-        explanation: "Promise resolutions and process.nextTick callbacks enter the microtask queue, which drains immediately after the current script run completes and before the next event loop phase."
+        correctAnswerIndex: 2,
+        explanation: "Promise callbacks run from the microtask queue. Node.js drains it after the current operation finishes and before the event loop continues to its next callback or phase. process.nextTick callbacks have their own queue, which runs before promise microtasks."
       },
       {
         id: "js_q2",
@@ -100,12 +111,12 @@ const quizzes = [
         type: "mcq",
         question: "What happens when Redis reaches 'maxmemory' under the 'allkeys-lru' eviction policy?",
         options: [
-          "It crashes with a kernel panic",
-          "It returns an Out-Of-Memory (OOM) error for all writes",
           "It automatically evicts the least recently used keys to free space",
+          "It returns an Out-Of-Memory (OOM) error for all writes",
+          "It crashes with a kernel panic",
           "It pauses writes and writes all keys to disk"
         ],
-        correctAnswerIndex: 2,
+        correctAnswerIndex: 0,
         explanation: "Under 'allkeys-lru', Redis frees memory by evicting the least recently used keys across all stored keys."
       }
     ]
@@ -119,7 +130,6 @@ const codeExercises = [
     title: "Valid Alphanumeric Palindrome",
     description: "Write a function `is_palindrome(s: str) -> bool` that returns True if the string is a palindrome, considering only alphanumeric characters and ignoring casing. Returns False otherwise.",
     difficulty: "Beginner",
-    languageId: 71,
     starterCode: `# Write a function to check if a string is a palindrome
 def is_palindrome(s: str) -> bool:
     # Your code here
@@ -151,9 +161,9 @@ print(is_palindrome(input_data))
     slug: "js-count-occurrences",
     techSlug: "javascript",
     title: "Word Frequency Counter",
-    description: "Write a program that reads a string from stdin and outputs a JSON string containing word frequencies in lowercase, stripped of punctuation.",
+    description: "Read a string from stdin. Lowercase it, split it into words on every non-alphanumeric character (so 'Node.js' becomes 'node' and 'js'), count each word, and print the counts with JSON.stringify. Key order does not matter.",
     difficulty: "Beginner",
-    languageId: 63,
+    outputComparison: "json",
     starterCode: `const fs = require('fs');
 
 function countWords(text) {
@@ -168,7 +178,7 @@ console.log(JSON.stringify(countWords(input)));
 
 function countWords(text) {
   if (!text) return {};
-  const words = text.toLowerCase().match(/\\b[a-z0-9]+\\b/g) || [];
+  const words = text.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
   const map = {};
   for (const w of words) {
     map[w] = (map[w] || 0) + 1;
