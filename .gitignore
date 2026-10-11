@@ -15,6 +15,7 @@ infra/judge0/*
 results/smoke-eval-*.json
 results/smoke-eval-*.csv
 results/.eval-*.partial.json
+results/.eval-checkpoint-*.json
 /eval_results.json
 /eval_results.csv
 

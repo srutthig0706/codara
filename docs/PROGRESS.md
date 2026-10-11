@@ -298,16 +298,21 @@ This document tracks the verified status, execution tests, unverified items, and
   - Added paired retrieval/no-retrieval evaluation with resumable checkpoints, AI and Docker-cache opt-outs, provider pinning (`--provider gemini|groq`), provider/model recording, schema checks, raw citation-produced/resolved counts, and Docker example execution results.
   - The two-case smoke run completed both modes for an Explain and a Scenario case. Reports were renamed with the `smoke-` prefix and gitignored; they are not benchmark results for publication.
   - The full run is pinned to Groq and checkpointed: 13/30 cases completed (27/60 mode results); a Groq quota/rate-limit response stopped `javascript-scenario-01` without retrieval. The harness printed the exact resume command for the current batch.
+  - Migrated the checkpoint to the provider-stable `results/.eval-checkpoint-groq.json`; the harness now resumes across dates and names final reports using the completion date. `--provider groq --status` reports checkpoint counts without database or provider calls.
+  - Verified the original dated checkpoint was preserved byte-for-byte during migration (matching SHA-256); the checkpoint-only command reported 13/30 completed cases and 27/60 mode results without dotenv, database, or LLM initialization. Focused harness tests passed: 4 tests, 0 failures.
   - After resuming the checkpoint, the full server suite passed: 40 tests, 0 failures, 0 skipped.
   - After adding same-provider retry for Groq JSON-format rejection and clean 429 checkpoint reporting, full server suite passed: 37 tests, 0 failures, 0 skipped.
   - Runner diagnosis: three concurrent short Node.js programs initially all hit the 5-second timeout. With an extended diagnostic limit, Docker/interpreter startup was about 2.6-3.6 seconds and Node process uptime about 0.4-1.2 seconds; pre-Docker wait estimates also included health checks and queueing. The timeout now starts at a language-runtime bootstrap marker, with separate queue/startup caps.
   - Focused Docker and evaluation/provider tests passed during Phase 10: 18 tests, 0 failures. The Phase 8 completion full server suite passed: 36 tests, 0 failures, 0 skipped.
 - **What Is Unverified:**
   - The full evaluation is paused by Groq's quota/rate limit at 13/30 complete cases (27/60 mode results checkpointed); 17 complete cases and 33 mode results remain. `javascript-scenario-01` has one mode result checkpointed. Resume with the same pinned provider and current batch selection.
+  - The full server suite was not run for this update because existing AI integration tests make live provider calls, prohibited for this task. The focused evaluation harness tests and no-call checkpoint inspection passed.
   - `results/summary.md` has not been generated because the evaluation is incomplete. Case wording/expected points remain placeholders for human editing.
   - The rare Windows volume-mount fallback path was not triggered by the current Docker tests.
 - **How to Run:**
   ```powershell
+  # Inspect the checkpoint only; this makes no provider calls.
+  node scripts/eval/run-eval.js --provider groq --status
   # Resume the current batch; completed modes are skipped from the checkpoint.
   node scripts/eval/run-eval.js --provider groq --case-ids python-scenario-03,javascript-scenario-01,javascript-scenario-02,javascript-scenario-03,javascript-scenario-04,redis-scenario-01
   # Then continue with the remaining batches in order.

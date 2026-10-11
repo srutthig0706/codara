@@ -5,7 +5,9 @@ const path = require("node:path");
 const {
   parseArgs,
   validateCases,
-  citationAssessment
+  citationAssessment,
+  getCheckpointPath,
+  countCompletedCases
 } = require("../../scripts/eval/run-eval");
 
 test("Evaluation case set contains the required enabled cases", () => {
@@ -23,6 +25,23 @@ test("Evaluation provider can be pinned and invalid choices are rejected", () =>
   assert.strictEqual(parseArgs(["--provider", "groq"]).provider, "groq");
   assert.strictEqual(parseArgs(["--provider", "gemini"]).provider, "gemini");
   assert.throws(() => parseArgs(["--provider", "auto"]), /--provider must be either/);
+  assert.strictEqual(parseArgs(["--provider", "groq", "--status"]).status, true);
+});
+
+test("Provider checkpoint path is stable and completed cases count paired results only", () => {
+  const cases = [
+    { id: "complete" },
+    { id: "partial" },
+    { id: "pending" }
+  ];
+  const records = {
+    "complete:with_retrieval": {},
+    "complete:without_retrieval": {},
+    "partial:with_retrieval": {}
+  };
+
+  assert.strictEqual(path.basename(getCheckpointPath("groq")), ".eval-checkpoint-groq.json");
+  assert.strictEqual(countCompletedCases(cases, records), 1);
 });
 
 test("Citation scoring counts produced and resolved citations without vacuous success", () => {

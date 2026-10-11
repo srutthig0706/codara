@@ -1,20 +1,5 @@
 const fs = require("fs");
 const path = require("path");
-require(path.resolve(__dirname, "../../server/node_modules/dotenv")).config({
-  path: path.resolve(__dirname, "../../server/.env")
-});
-
-const { connectDB, closeDB } = require("../../server/config/db");
-const { retrieveRelevantChunks, loadChunksIntoMemory } = require("../../server/services/rag.service");
-const { generateJSON } = require("../../server/services/llm.service");
-const { runCode } = require("../../server/services/dockerRunner.service");
-const {
-  ExplainResponseSchema,
-  ScenarioResponseSchema,
-  CompareResponseSchema,
-  validateScenarioGraph,
-  validateCompareResponse
-} = require("../../server/schemas/ai.schema");
 
 const CASES_PATH = path.join(__dirname, "cases.json");
 const RESULTS_DIR = path.resolve(__dirname, "../../results");
@@ -26,14 +11,60 @@ const RATE_LIMIT_INSTRUCTIONS = [
   "Retry with: node scripts/eval/run-eval.js"
 ].join("\n");
 
-const SCHEMAS = {
-  explain: ExplainResponseSchema,
-  scenario: ScenarioResponseSchema,
-  compare: CompareResponseSchema
-};
+let connectDB;
+let closeDB;
+let retrieveRelevantChunks;
+let loadChunksIntoMemory;
+let generateJSON;
+let runCode;
+let SCHEMAS;
+let validateScenarioGraph;
+let validateCompareResponse;
+
+function loadEvaluationServices() {
+  ({ connectDB, closeDB } = require("../../server/config/db"));
+  ({ retrieveRelevantChunks, loadChunksIntoMemory } = require("../../server/services/rag.service"));
+  ({ generateJSON } = require("../../server/services/llm.service"));
+  ({ runCode } = require("../../server/services/dockerRunner.service"));
+  const {
+    ExplainResponseSchema,
+    ScenarioResponseSchema,
+    CompareResponseSchema,
+    validateScenarioGraph,
+    validateCompareResponse
+  } = require("../../server/schemas/ai.schema");
+  SCHEMAS = {
+    explain: ExplainResponseSchema,
+    scenario: ScenarioResponseSchema,
+    compare: CompareResponseSchema
+  };
+}
+
+function getCheckpointPath(provider) {
+  return path.join(RESULTS_DIR, `.eval-checkpoint-${provider}.json`);
+}
+
+function loadCheckpoint(checkpointPath, providerSelection) {
+  if (!fs.existsSync(checkpointPath)) return {};
+  const saved = JSON.parse(fs.readFileSync(checkpointPath, "utf8"));
+  if (saved.provider !== providerSelection) {
+    throw new Error(`Checkpoint uses provider '${saved.provider || "unspecified"}'; this run selects '${providerSelection}'. Resume with the same provider or move the checkpoint aside.`);
+  }
+  if (!saved.records || typeof saved.records !== "object" || Array.isArray(saved.records)) {
+    throw new Error(`Checkpoint at ${checkpointPath} does not contain valid records.`);
+  }
+  return saved.records;
+}
+
+function countCompletedCases(cases, recordsByKey) {
+  return cases.filter(item =>
+    recordsByKey[getModeResultKey(item.id, "with_retrieval")] &&
+    recordsByKey[getModeResultKey(item.id, "without_retrieval")]
+  ).length;
+}
 
 function parseArgs(args) {
-  const options = { limit: null, delayMs: 5000, caseIds: null, provider: null };
+  const options = { limit: null, delayMs: 5000, caseIds: null, provider: null, status: false };
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     if (arg === "--limit") {
@@ -56,6 +87,8 @@ function parseArgs(args) {
       if (!["gemini", "groq"].includes(options.provider)) {
         throw new Error("--provider must be either 'gemini' or 'groq'.");
       }
+    } else if (arg === "--status") {
+      options.status = true;
     } else if (arg === "--help" || arg === "-h") {
       options.help = true;
     } else {
@@ -327,8 +360,9 @@ function flattenReport(cases, recordsByKey) {
 }
 
 function printUsage() {
-  console.log("Usage: node scripts/eval/run-eval.js [--limit N] [--case-ids id1,id2] [--delay-ms N] [--provider gemini|groq]");
-  console.log("Defaults: all enabled cases, a 5-second pause between LLM calls, and resume from partial results.");
+  console.log("Usage: node scripts/eval/run-eval.js [--limit N] [--case-ids id1,id2] [--delay-ms N] [--provider gemini|groq] [--status]");
+  console.log("Defaults: all enabled cases, a 5-second pause between LLM calls, and resume from the provider checkpoint.");
+  console.log("--status requires --provider and only reads the checkpoint; it makes no provider or database calls.");
 }
 
 async function runEvaluation(args = process.argv.slice(2)) {
@@ -337,6 +371,27 @@ async function runEvaluation(args = process.argv.slice(2)) {
     printUsage();
     return;
   }
+  if (options.status && !options.provider) {
+    throw new Error("--status requires --provider gemini|groq.");
+  }
+
+  const allCases = JSON.parse(fs.readFileSync(CASES_PATH, "utf8"));
+  validateCases(allCases);
+  const enabledCases = allCases.filter(item => item.enabled);
+  const providerSelection = options.provider || "auto";
+  const partialPath = getCheckpointPath(providerSelection);
+  if (options.status) {
+    const recordsByKey = loadCheckpoint(partialPath, providerSelection);
+    const completedCount = countCompletedCases(enabledCases, recordsByKey);
+    console.log(`[Checkpoint] ${providerSelection}: ${completedCount}/${enabledCases.length} enabled cases complete; ${enabledCases.length - completedCount} remain; ${Object.keys(recordsByKey).length}/${enabledCases.length * 2} mode results saved.`);
+    console.log(`Checkpoint file: ${partialPath}`);
+    return true;
+  }
+
+  require(path.resolve(__dirname, "../../server/node_modules/dotenv")).config({
+    path: path.resolve(__dirname, "../../server/.env")
+  });
+  loadEvaluationServices();
   if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
     console.error(RATE_LIMIT_INSTRUCTIONS);
     return false;
@@ -346,8 +401,6 @@ async function runEvaluation(args = process.argv.slice(2)) {
     return false;
   }
 
-  const allCases = JSON.parse(fs.readFileSync(CASES_PATH, "utf8"));
-  validateCases(allCases);
   let selected = allCases.filter(item => item.enabled);
   if (options.caseIds) {
     const unknownIds = options.caseIds.filter(id => !allCases.some(item => item.id === id));
@@ -361,21 +414,7 @@ async function runEvaluation(args = process.argv.slice(2)) {
     throw new Error("A selected case has no implemented evaluation schema.");
   }
 
-  const date = new Date().toISOString().slice(0, 10);
-  const partialPath = path.join(RESULTS_DIR, `.eval-${date}.partial.json`);
-  const jsonPath = path.join(RESULTS_DIR, `eval-${date}.json`);
-  const csvPath = path.join(RESULTS_DIR, `eval-${date}.csv`);
-  let recordsByKey = {};
-  const providerSelection = options.provider || "auto";
-  if (fs.existsSync(partialPath)) {
-    const saved = JSON.parse(fs.readFileSync(partialPath, "utf8"));
-    if (saved.date === date && saved.records && typeof saved.records === "object") {
-      if (saved.provider !== providerSelection) {
-        throw new Error(`Partial results use provider '${saved.provider || "unspecified"}'; this run selects '${providerSelection}'. Resume with the same provider or move the partial file aside.`);
-      }
-      recordsByKey = saved.records;
-    }
-  }
+  let recordsByKey = loadCheckpoint(partialPath, providerSelection);
   recordsByKey = Object.fromEntries(
     Object.entries(recordsByKey).filter(([key, record]) => {
       const selectedCase = selected.find(item =>
@@ -464,7 +503,6 @@ async function runEvaluation(args = process.argv.slice(2)) {
         };
         fs.mkdirSync(RESULTS_DIR, { recursive: true });
         fs.writeFileSync(partialPath, JSON.stringify({
-          date,
           provider: providerSelection,
           records: recordsByKey
         }, null, 2));
@@ -474,16 +512,9 @@ async function runEvaluation(args = process.argv.slice(2)) {
     if (db) await closeDB();
   }
 
-  const enabledCases = allCases.filter(item => item.enabled);
-  const complete = enabledCases.every(item =>
-    recordsByKey[getModeResultKey(item.id, "with_retrieval")] &&
-    recordsByKey[getModeResultKey(item.id, "without_retrieval")]
-  );
+  const completedCount = countCompletedCases(enabledCases, recordsByKey);
+  const complete = completedCount === enabledCases.length;
   if (!complete) {
-    const completedCount = enabledCases.filter(item =>
-      recordsByKey[getModeResultKey(item.id, "with_retrieval")] &&
-      recordsByKey[getModeResultKey(item.id, "without_retrieval")]
-    ).length;
     console.log(`[Checkpoint] ${completedCount}/${enabledCases.length} enabled cases complete; ${enabledCases.length - completedCount} remain. Partial results saved to ${partialPath}`);
     return true;
   }
@@ -493,8 +524,12 @@ async function runEvaluation(args = process.argv.slice(2)) {
     withRetrieval: recordsByKey[getModeResultKey(item.id, "with_retrieval")].result,
     withoutRetrieval: recordsByKey[getModeResultKey(item.id, "without_retrieval")].result
   }));
+  const generatedAt = new Date().toISOString();
+  const completionDate = generatedAt.slice(0, 10);
+  const jsonPath = path.join(RESULTS_DIR, `eval-${completionDate}.json`);
+  const csvPath = path.join(RESULTS_DIR, `eval-${completionDate}.csv`);
   const report = {
-    generatedAt: new Date().toISOString(),
+    generatedAt,
     caseCount: orderedResults.length,
     modes: ["with_retrieval", "without_retrieval"],
     cases: orderedResults
@@ -524,6 +559,9 @@ module.exports = {
   runEvaluation,
   parseArgs,
   validateCases,
+  getCheckpointPath,
+  loadCheckpoint,
+  countCompletedCases,
   extractCodeBlocks,
   citationAssessment,
   assessCodeExamples

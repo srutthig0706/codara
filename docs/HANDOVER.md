@@ -59,7 +59,7 @@ The timings are approximate; AI generation and Docker startup depend on local re
 
 ## Known Limitations and Unverified Items
 
-- The full evaluation is incomplete: the latest checkpoint records 13 of 30 cases complete (27 of 60 mode results), and Groq stopped on a quota/rate limit during `javascript-scenario-01` without retrieval. `results/summary.md` is not yet a complete benchmark. Continue with the same pinned provider and batch commands in `docs/PROGRESS.md`.
+- The full evaluation is incomplete: the latest checkpoint records 13 of 30 cases complete (27 of 60 mode results) in `results/.eval-checkpoint-groq.json`, and Groq stopped on a quota/rate limit during `javascript-scenario-01` without retrieval. Inspect without provider calls using `node scripts/eval/run-eval.js --provider groq --status`. `results/summary.md` is not yet a complete benchmark. Continue with the same pinned provider and batch commands in `docs/PROGRESS.md`.
 - Evaluation case text and expected points are placeholders until a human edits and approves them; automatic structural and citation checks are not factual accuracy scoring.
 - Seeded learning material, quiz answer keys, source URLs, and license attributions have not received comprehensive human review.
 - AI features depend on external provider availability, network access, quotas, and rate limits. Do not switch providers mid-run when continuing a pinned evaluation.
