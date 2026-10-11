@@ -120,6 +120,35 @@ function enforceCitations(outputJson, retrievedChunks) {
   return outputJson;
 }
 
+async function callAndValidate(provider, prompt, schema) {
+  const callProvider = provider === "gemini" ? callGemini : callGroq;
+  const label = provider === "gemini" ? "Gemini" : "Groq";
+  const rawJson = await callProvider(prompt);
+  const parsed = schema.safeParse(rawJson);
+  if (parsed.success) return parsed.data;
+
+  console.warn(`[LLM] ${label} schema validation failed. Retrying once with error trace...`);
+  const retryPrompt = `${prompt}\n\nIMPORTANT: Your previous response failed validation with errors: ${JSON.stringify(parsed.error.flatten().fieldErrors)}. Output valid JSON conforming strictly to schema.`;
+  const retryJson = await callProvider(retryPrompt);
+  const retryParsed = schema.safeParse(retryJson);
+  if (!retryParsed.success) {
+    throw new Error(`${label} schema retry failed: ${JSON.stringify(retryParsed.error.flatten().fieldErrors)}`);
+  }
+  return retryParsed.data;
+}
+
+function measureCitations(outputJson, retrievedChunks) {
+  const sources = Array.isArray(outputJson?.citations)
+    ? outputJson.citations.map(citation => citation.sourceUrl)
+    : [];
+  const retrievedUrls = new Set(retrievedChunks.map(chunk => chunk.sourceUrl));
+  return {
+    producedCount: sources.length,
+    resolvedCount: sources.filter(sourceUrl => retrievedUrls.has(sourceUrl)).length,
+    sources
+  };
+}
+
 /**
  * Unified server-side AI wrapper:
  * 1. Checks MongoDB ai_cache via SHA-256 key.
@@ -136,85 +165,81 @@ async function generateJSON({
   action,
   input,
   promptVersion = "v1",
-  retrievedChunks = []
+  retrievedChunks = [],
+  useCache = true,
+  provider = null
 }) {
+  if (provider !== null && !["gemini", "groq"].includes(provider)) {
+    throw new Error(`Unsupported pinned LLM provider '${provider}'. Use 'gemini' or 'groq'.`);
+  }
+  if (provider === "gemini" && !GEMINI_API_KEY) {
+    throw new Error("Pinned LLM provider 'gemini' is unavailable: GEMINI_API_KEY is not configured.");
+  }
+  if (provider === "groq" && !GROQ_API_KEY) {
+    throw new Error("Pinned LLM provider 'groq' is unavailable: GROQ_API_KEY is not configured.");
+  }
+
   // 1. Check Cache
   const cacheKey = computeCacheKey({ technology, action, input, promptVersion });
-  const cachedData = await getCachedAIResponse(cacheKey);
+  const cachedData = useCache ? await getCachedAIResponse(cacheKey) : null;
   if (cachedData) {
     return {
       data: cachedData,
       fromCache: true,
       providerUsed: "cache",
+      modelUsed: null,
+      citationMetrics: measureCitations(cachedData, retrievedChunks),
       cacheKey
     };
   }
 
   let finalData = null;
-  let providerUsed = "gemini";
-
-  // 2. Try Gemini
-  try {
-    let rawJson = await callGemini(prompt);
-    let parsed = schema.safeParse(rawJson);
-
-    if (!parsed.success) {
-      console.warn("[LLM] Gemini schema validation failed. Retrying once with error trace...");
-      const retryPrompt = `${prompt}\n\nIMPORTANT: Your previous response failed validation with errors: ${JSON.stringify(parsed.error.flatten().fieldErrors)}. Output valid JSON conforming strictly to schema.`;
-      const retryJson = await callGemini(retryPrompt);
-      const retryParsed = schema.safeParse(retryJson);
-      if (!retryParsed.success) {
-        throw new Error(`Gemini schema retry failed: ${JSON.stringify(retryParsed.error.flatten().fieldErrors)}`);
-      }
-      finalData = retryParsed.data;
-    } else {
-      finalData = parsed.data;
-    }
-  } catch (geminiError) {
-    console.warn(`[LLM] Gemini failed (${geminiError.message}). Falling back to Groq Cloud...`);
-    providerUsed = "groq";
-
+  let providerUsed = provider || "gemini";
+  if (provider) {
     try {
-      let rawJson = await callGroq(prompt);
-      let parsed = schema.safeParse(rawJson);
-
-      if (!parsed.success) {
-        console.warn("[LLM] Groq schema validation failed. Retrying once with error trace...");
-        const retryPrompt = `${prompt}\n\nIMPORTANT: Your previous response failed validation with errors: ${JSON.stringify(parsed.error.flatten().fieldErrors)}. Output valid JSON conforming strictly to schema.`;
-        const retryJson = await callGroq(retryPrompt);
-        const retryParsed = schema.safeParse(retryJson);
-        if (!retryParsed.success) {
-          throw new Error(`Groq schema retry failed: ${JSON.stringify(retryParsed.error.flatten().fieldErrors)}`);
-        }
-        finalData = retryParsed.data;
-      } else {
-        finalData = parsed.data;
+      finalData = await callAndValidate(provider, prompt, schema);
+    } catch (error) {
+      throw new Error(`Pinned LLM provider '${provider}' failed: ${error.message}`);
+    }
+  } else {
+    try {
+      finalData = await callAndValidate("gemini", prompt, schema);
+    } catch (geminiError) {
+      console.warn(`[LLM] Gemini failed (${geminiError.message}). Falling back to Groq Cloud...`);
+      providerUsed = "groq";
+      try {
+        finalData = await callAndValidate("groq", prompt, schema);
+      } catch (groqError) {
+        throw new Error(`All LLM providers failed. Gemini: ${geminiError.message}; Groq: ${groqError.message}`);
       }
-    } catch (groqError) {
-      throw new Error(`All LLM providers failed. Gemini: ${geminiError.message}; Groq: ${groqError.message}`);
     }
   }
 
+  const citationMetrics = measureCitations(finalData, retrievedChunks);
   // 3. Enforce Grounded Citations
   finalData = enforceCitations(finalData, retrievedChunks);
 
   // 4. Save to MongoDB Cache
   const citations = retrievedChunks.map(c => c.sourceUrl);
-  await setCachedAIResponse({
-    cacheKey,
-    technology,
-    action,
-    input,
-    promptVersion,
-    responseJson: finalData,
-    providerUsed,
-    retrievalCitations: citations
-  });
+  if (useCache) {
+    await setCachedAIResponse({
+      cacheKey,
+      technology,
+      action,
+      input,
+      promptVersion,
+      responseJson: finalData,
+      providerUsed,
+      retrievalCitations: citations
+    });
+  }
 
   return {
     data: finalData,
     fromCache: false,
     providerUsed,
+    modelUsed: providerUsed === "gemini" ? GEMINI_MODEL : GROQ_MODEL,
+    citationMetrics,
     cacheKey
   };
 }

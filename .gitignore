@@ -12,6 +12,10 @@ infra/judge0/
 infra/judge0/*
 .runs/
 .runs/*
+results/smoke-eval-*.json
+results/smoke-eval-*.csv
+/eval_results.json
+/eval_results.csv
 
 # Build outputs
 dist/

@@ -7,8 +7,8 @@ This document tracks the verified status, execution tests, unverified items, and
 ## Overall Status Summary
 
 - **Current Active Phase:** Phase 10 (Evaluation Scripts & README)
-- **Last Verified Phase:** Phase 7 (Tests Module)
-- **Git State:** Clean, all secrets gitignored, no `.env`, `.runs`, or `node_modules` committed.
+- **Last Verified Phase:** Phase 10 evaluation harness smoke test and full server suite
+- **Git State:** Generated smoke results are ignored; existing legacy evaluator files remain outside the Phase 10 deliverables.
 
 ---
 
@@ -264,10 +264,23 @@ This document tracks the verified status, execution tests, unverified items, and
 ---
 
 ### Phase 10: Evaluation & Benchmarking
-- **Status:** Pending Execution
-- **What Was Verified:** -
-- **What Is Unverified:** -
-- **How to Run:** -
+- **Status:** Harness Implemented & Smoke Verified
+- **What Was Verified:**
+  - Added 30 editable cases (10 Explain, 10 Scenario, 10 Compare) across Python, JavaScript, and Redis. Compare cases are disabled until a Compare route exists.
+  - Added paired retrieval/no-retrieval evaluation with resumable checkpoints, AI and Docker-cache opt-outs, provider pinning (`--provider gemini|groq`), provider/model recording, schema checks, raw citation-produced/resolved counts, and Docker example execution results.
+  - The two-case smoke run completed both modes for an Explain and a Scenario case. Reports were renamed with the `smoke-` prefix and gitignored; they are not benchmark results for publication.
+  - Runner diagnosis: three concurrent short Node.js programs initially all hit the 5-second timeout. With an extended diagnostic limit, Docker/interpreter startup was about 2.6-3.6 seconds and Node process uptime about 0.4-1.2 seconds; pre-Docker wait estimates also included health checks and queueing. The timeout now starts at a language-runtime bootstrap marker, with separate queue/startup caps.
+  - Focused Docker and evaluation/provider tests passed: 18 tests, 0 failures. Full server suite passed: 33 tests, 0 failures, 0 skipped.
+- **What Is Unverified:**
+  - The full 30-case evaluation has intentionally not been run; case wording/expected points remain placeholders for human editing.
+  - The rare Windows volume-mount fallback path was not triggered by the current Docker tests.
+- **How to Run:**
+  ```powershell
+  node scripts/eval/run-eval.js --limit 2
+  node scripts/eval/run-eval.js --provider groq
+  cd server
+  node --test
+  ```
 
 ---
 
@@ -280,6 +293,6 @@ This document tracks the verified status, execution tests, unverified items, and
 
 ## Copilot Instructions Update (2026-10-11)
 
-- **Verified:** Added `.github/copilot-instructions.md` covering Codara architecture, security boundaries, product rules, task verification/commit expectations, and concise final reporting. Full server suite (`cd server; node --test`): 27 tests passed, 0 failed.
+- **Verified:** Added `.github/copilot-instructions.md` covering Codara architecture, security boundaries, product rules, task verification/commit expectations, and concise final reporting. Initial full server suite: 27 tests passed, 0 failed.
 - **Unverified:** Whether future Copilot sessions consistently follow the new instructions cannot be verified in this task.
 - **Next step:** Review instruction effectiveness during future Codara tasks and revise only if needed.

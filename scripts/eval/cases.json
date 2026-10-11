@@ -1,0 +1,242 @@
+[
+  {
+    "id": "python-explain-01",
+    "type": "explain",
+    "technologies": ["python"],
+    "input": "PLACEHOLDER: Ask for an explanation of a core Python concept.",
+    "expectedPoints": ["PLACEHOLDER: Add a factually essential point.", "PLACEHOLDER: Add a mechanism or example to verify."],
+    "enabled": true
+  },
+  {
+    "id": "python-explain-02",
+    "type": "explain",
+    "technologies": ["python"],
+    "input": "PLACEHOLDER: Ask how a Python language feature works internally.",
+    "expectedPoints": ["PLACEHOLDER: Add the relevant behavior.", "PLACEHOLDER: Add an important limitation or trade-off."],
+    "enabled": true
+  },
+  {
+    "id": "python-explain-03",
+    "type": "explain",
+    "technologies": ["python"],
+    "input": "PLACEHOLDER: Ask about a Python runtime or memory behavior.",
+    "expectedPoints": ["PLACEHOLDER: Add an accurate runtime detail.", "PLACEHOLDER: Add a practical implication."],
+    "enabled": true
+  },
+  {
+    "id": "javascript-explain-01",
+    "type": "explain",
+    "technologies": ["javascript"],
+    "input": "PLACEHOLDER: Ask for an explanation of a core JavaScript concept.",
+    "expectedPoints": ["PLACEHOLDER: Add a factually essential point.", "PLACEHOLDER: Add a mechanism or example to verify."],
+    "enabled": true
+  },
+  {
+    "id": "javascript-explain-02",
+    "type": "explain",
+    "technologies": ["javascript"],
+    "input": "PLACEHOLDER: Ask how an asynchronous JavaScript feature behaves.",
+    "expectedPoints": ["PLACEHOLDER: Add the relevant behavior.", "PLACEHOLDER: Add an important limitation or trade-off."],
+    "enabled": true
+  },
+  {
+    "id": "javascript-explain-03",
+    "type": "explain",
+    "technologies": ["javascript"],
+    "input": "PLACEHOLDER: Ask about a JavaScript engine or runtime mechanism.",
+    "expectedPoints": ["PLACEHOLDER: Add an accurate runtime detail.", "PLACEHOLDER: Add a practical implication."],
+    "enabled": true
+  },
+  {
+    "id": "redis-explain-01",
+    "type": "explain",
+    "technologies": ["redis"],
+    "input": "PLACEHOLDER: Ask for an explanation of a Redis data structure.",
+    "expectedPoints": ["PLACEHOLDER: Add a factually essential point.", "PLACEHOLDER: Add a complexity or usage detail."],
+    "enabled": true
+  },
+  {
+    "id": "redis-explain-02",
+    "type": "explain",
+    "technologies": ["redis"],
+    "input": "PLACEHOLDER: Ask how a Redis persistence feature works.",
+    "expectedPoints": ["PLACEHOLDER: Add the persistence behavior.", "PLACEHOLDER: Add an important durability trade-off."],
+    "enabled": true
+  },
+  {
+    "id": "redis-explain-03",
+    "type": "explain",
+    "technologies": ["redis"],
+    "input": "PLACEHOLDER: Ask about Redis concurrency or command execution.",
+    "expectedPoints": ["PLACEHOLDER: Add an accurate execution detail.", "PLACEHOLDER: Add a practical implication."],
+    "enabled": true
+  },
+  {
+    "id": "redis-explain-04",
+    "type": "explain",
+    "technologies": ["redis"],
+    "input": "PLACEHOLDER: Ask about a Redis configuration or operational behavior.",
+    "expectedPoints": ["PLACEHOLDER: Add the relevant behavior.", "PLACEHOLDER: Add an important limitation or trade-off."],
+    "enabled": true
+  },
+  {
+    "id": "python-scenario-01",
+    "type": "scenario",
+    "technologies": ["python"],
+    "input": "PLACEHOLDER: Describe a system scenario where Python's behavior affects performance or correctness.",
+    "expectedPoints": ["PLACEHOLDER: Identify the system behavior without the relevant feature.", "PLACEHOLDER: Explain the change and its trade-off."],
+    "enabled": true
+  },
+  {
+    "id": "python-scenario-02",
+    "type": "scenario",
+    "technologies": ["python"],
+    "input": "PLACEHOLDER: Describe a workload that makes a Python concurrency choice important.",
+    "expectedPoints": ["PLACEHOLDER: Identify the bottleneck or constraint.", "PLACEHOLDER: Explain how the chosen approach changes the outcome."],
+    "enabled": true
+  },
+  {
+    "id": "python-scenario-03",
+    "type": "scenario",
+    "technologies": ["python"],
+    "input": "PLACEHOLDER: Describe a Python data-processing scenario with a memory constraint.",
+    "expectedPoints": ["PLACEHOLDER: Identify the memory-related issue.", "PLACEHOLDER: Explain a suitable mechanism and its trade-off."],
+    "enabled": true
+  },
+  {
+    "id": "javascript-scenario-01",
+    "type": "scenario",
+    "technologies": ["javascript"],
+    "input": "PLACEHOLDER: Describe a Node.js workload where event-loop responsiveness matters.",
+    "expectedPoints": ["PLACEHOLDER: Identify the blocking or scheduling issue.", "PLACEHOLDER: Explain how the architecture changes the outcome."],
+    "enabled": true
+  },
+  {
+    "id": "javascript-scenario-02",
+    "type": "scenario",
+    "technologies": ["javascript"],
+    "input": "PLACEHOLDER: Describe a streaming JavaScript service handling data at uneven rates.",
+    "expectedPoints": ["PLACEHOLDER: Identify the buffering risk.", "PLACEHOLDER: Explain how backpressure affects the flow."],
+    "enabled": true
+  },
+  {
+    "id": "javascript-scenario-03",
+    "type": "scenario",
+    "technologies": ["javascript"],
+    "input": "PLACEHOLDER: Describe a JavaScript service doing asynchronous I/O under load.",
+    "expectedPoints": ["PLACEHOLDER: Identify the relevant scheduling or resource constraint.", "PLACEHOLDER: Explain the resulting system behavior."],
+    "enabled": true
+  },
+  {
+    "id": "javascript-scenario-04",
+    "type": "scenario",
+    "technologies": ["javascript"],
+    "input": "PLACEHOLDER: Describe a JavaScript application where shared state or module behavior matters.",
+    "expectedPoints": ["PLACEHOLDER: Identify the state or module behavior.", "PLACEHOLDER: Explain a practical consequence and mitigation."],
+    "enabled": true
+  },
+  {
+    "id": "redis-scenario-01",
+    "type": "scenario",
+    "technologies": ["redis"],
+    "input": "PLACEHOLDER: Describe a service workload where Redis caching changes database load.",
+    "expectedPoints": ["PLACEHOLDER: Identify the original bottleneck.", "PLACEHOLDER: Explain the cache path and a consistency trade-off."],
+    "enabled": true
+  },
+  {
+    "id": "redis-scenario-02",
+    "type": "scenario",
+    "technologies": ["redis"],
+    "input": "PLACEHOLDER: Describe a Redis deployment where persistence and recovery matter.",
+    "expectedPoints": ["PLACEHOLDER: Identify the failure or recovery requirement.", "PLACEHOLDER: Explain a persistence option and its trade-off."],
+    "enabled": true
+  },
+  {
+    "id": "redis-scenario-03",
+    "type": "scenario",
+    "technologies": ["redis"],
+    "input": "PLACEHOLDER: Describe a Redis workload where memory pressure changes behavior.",
+    "expectedPoints": ["PLACEHOLDER: Identify the memory pressure effect.", "PLACEHOLDER: Explain the configured policy and consequence."],
+    "enabled": true
+  },
+  {
+    "id": "python-compare-01",
+    "type": "compare",
+    "technologies": ["python", "javascript"],
+    "input": "PLACEHOLDER: Compare how Python and JavaScript handle asynchronous I/O for a specified workload.",
+    "expectedPoints": ["PLACEHOLDER: State a meaningful similarity or difference.", "PLACEHOLDER: Relate the trade-off to the workload."],
+    "enabled": false
+  },
+  {
+    "id": "python-compare-02",
+    "type": "compare",
+    "technologies": ["python", "redis"],
+    "input": "PLACEHOLDER: Compare a Python in-process data structure with a Redis data structure for a specified use case.",
+    "expectedPoints": ["PLACEHOLDER: Compare locality, persistence, or sharing.", "PLACEHOLDER: State an operational trade-off."],
+    "enabled": false
+  },
+  {
+    "id": "python-compare-03",
+    "type": "compare",
+    "technologies": ["python", "javascript"],
+    "input": "PLACEHOLDER: Compare a Python and JavaScript execution model for a CPU-bound workload.",
+    "expectedPoints": ["PLACEHOLDER: Accurately distinguish the execution models.", "PLACEHOLDER: Relate the difference to scaling choices."],
+    "enabled": false
+  },
+  {
+    "id": "javascript-compare-01",
+    "type": "compare",
+    "technologies": ["javascript", "redis"],
+    "input": "PLACEHOLDER: Compare in-process JavaScript state with Redis-backed shared state.",
+    "expectedPoints": ["PLACEHOLDER: Compare scope and lifetime of state.", "PLACEHOLDER: Explain a consistency or availability trade-off."],
+    "enabled": false
+  },
+  {
+    "id": "javascript-compare-02",
+    "type": "compare",
+    "technologies": ["javascript", "python"],
+    "input": "PLACEHOLDER: Compare JavaScript promises with a Python asynchronous programming approach.",
+    "expectedPoints": ["PLACEHOLDER: Compare scheduling or concurrency semantics.", "PLACEHOLDER: Identify a practical workload distinction."],
+    "enabled": false
+  },
+  {
+    "id": "javascript-compare-03",
+    "type": "compare",
+    "technologies": ["javascript", "redis"],
+    "input": "PLACEHOLDER: Compare an in-memory JavaScript cache with Redis for a multi-instance service.",
+    "expectedPoints": ["PLACEHOLDER: Compare sharing and failure behavior.", "PLACEHOLDER: Explain a latency or operations trade-off."],
+    "enabled": false
+  },
+  {
+    "id": "redis-compare-01",
+    "type": "compare",
+    "technologies": ["redis", "python"],
+    "input": "PLACEHOLDER: Compare Redis pub/sub with an in-process Python event mechanism for durability.",
+    "expectedPoints": ["PLACEHOLDER: Distinguish delivery and persistence guarantees.", "PLACEHOLDER: Recommend based on stated requirements."],
+    "enabled": false
+  },
+  {
+    "id": "redis-compare-02",
+    "type": "compare",
+    "technologies": ["redis", "javascript"],
+    "input": "PLACEHOLDER: Compare Redis persistence with process-local JavaScript state after a restart.",
+    "expectedPoints": ["PLACEHOLDER: Distinguish persistence and recovery behavior.", "PLACEHOLDER: Describe a relevant durability trade-off."],
+    "enabled": false
+  },
+  {
+    "id": "redis-compare-03",
+    "type": "compare",
+    "technologies": ["redis", "python"],
+    "input": "PLACEHOLDER: Compare Redis and Python data structures for a shared leaderboard workload.",
+    "expectedPoints": ["PLACEHOLDER: Compare supported operations or complexity.", "PLACEHOLDER: Relate the choice to sharing and scaling."],
+    "enabled": false
+  },
+  {
+    "id": "redis-compare-04",
+    "type": "compare",
+    "technologies": ["redis", "javascript"],
+    "input": "PLACEHOLDER: Compare Redis and a JavaScript in-memory cache under memory pressure.",
+    "expectedPoints": ["PLACEHOLDER: Compare eviction or memory scope.", "PLACEHOLDER: Explain an operational consequence."],
+    "enabled": false
+  }
+]

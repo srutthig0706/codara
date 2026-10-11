@@ -46,6 +46,8 @@ Non-secret runner configuration resides in `server/config/runner.config.js` with
 - Timeout: `5000 ms`
 - Concurrency limit: `2`
 
+The user-code timeout starts after the interpreter bootstrap marker, so Docker/interpreter startup and time spent waiting for a runner slot do not consume the code's execution budget. Container startup and queue waits have separate hard caps. Runner timing results expose `queueWaitMs`, `containerStartupMs`, and `programTimeMs` separately.
+
 ---
 
 ## 4. Pre-Flight Verification
@@ -101,6 +103,25 @@ node scripts/verify_code_snippets.js
 Runs all catalog examples and seeded code exercises against the real Docker runner and confirms execution statuses.
 
 ---
+
+### AI Evaluation Harness
+
+The evaluation harness runs each enabled case once with local documentation retrieval and once with zero retrieved context. It calls the same server-side RAG, schema-validated LLM, and Docker code-runner services as the application; the AI response cache is disabled for evaluation. Compare cases remain disabled until a Compare route and response schema are implemented.
+
+1. Configure `server/.env` with at least one working provider key (`GEMINI_API_KEY` or `GROQ_API_KEY`), MongoDB, and the required local documentation chunks. Ensure Docker Desktop is running and the Python/Node runner images are available if generated code examples should be executed.
+2. Edit `scripts/eval/cases.json` to replace the `PLACEHOLDER` inputs and expected points. Use `enabled: false` to skip any case.
+3. From the repository root, run:
+   ```powershell
+   node scripts/eval/run-eval.js
+   ```
+   The script evaluates all enabled cases, waits five seconds between LLM calls by default, and resumes from `results/.eval-<date>.partial.json` if interrupted.
+4. Find completed reports at `results/eval-<date>.json` and `results/eval-<date>.csv`. They include provider and model per result, schema validity, citations produced and citations resolved to retrieved chunk IDs for both modes, response/retrieval timings, and Docker execution outcomes for fenced Python or JavaScript code (the runner cache is bypassed during evaluation). A zero-citation response is not marked as grounded. Redis examples and responses without fenced code are marked as unsupported/not provided. Use `results/rubric.md` to score factual accuracy manually; the harness never invents manual scores.
+
+For a small smoke run, select only a few cases:
+```powershell
+node scripts/eval/run-eval.js --limit 2
+```
+Optional arguments are `--case-ids id1,id2`, `--delay-ms N`, and `--provider gemini|groq`. Pin a provider when comparing runs; a pinned provider never falls back, and each result records the answering provider/model. If neither configured LLM provider is available, the harness prints setup instructions and does not write final result reports. Successful mode results are checkpointed so a later run can resume; final JSON/CSV files are only written when all selected cases finish.
 
 ## 7. Security Notice & Scope
 

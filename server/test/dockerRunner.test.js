@@ -33,7 +33,17 @@ test("Unit Tests: Docker Runner Pure Logic", async (t) => {
     assert.ok(args.includes("--user") && args[args.indexOf("--user") + 1] === "1000:1000", "Must run as non-root user");
     assert.ok(args.includes("-v"), "Must mount volume");
     assert.ok(args.includes("python:3.12-slim"));
+    assert.ok(args.includes("--env") && args[args.indexOf("--env") + 1] === "PYTHONPATH=/app");
     assert.deepStrictEqual(args.slice(-3), ["python", "-u", "/app/script.py"]);
+
+    const jsArgs = buildDockerRunArgs({
+      containerName: "test-container-js",
+      hostDir: "D:\\codara\\.runs\\test-js",
+      language: "javascript",
+      image: "node:22-slim"
+    });
+    assert.ok(jsArgs.includes("--require"));
+    assert.ok(jsArgs.includes("/app/runner-start.js"));
   });
 
   // 2. Truncation logic caps at limit and appends notice
@@ -81,11 +91,11 @@ test("Unit Tests: Docker Runner Pure Logic", async (t) => {
   });
 });
 
-test("Integration Tests: Real Docker Container Execution", async (t) => {
+test("Integration Tests: Real Docker Container Execution", { concurrency: 1, timeout: 360000 }, async (t) => {
   clearCache();
 
   // 1. Python real execution: print(2+2)
-  await t.test("Python: executes print(2+2) -> accepted with output 4", async () => {
+  await t.test("Python: executes print(2+2) -> accepted with output 4", { timeout: 90000 }, async () => {
     const res = await runCode({
       language: "python",
       code: "print(2 + 2)"
@@ -98,7 +108,7 @@ test("Integration Tests: Real Docker Container Execution", async (t) => {
   });
 
   // 2. Node real execution: console.log(2+2)
-  await t.test("Node.js: executes console.log(2+2) -> accepted with output 4", async () => {
+  await t.test("Node.js: executes console.log(2+2) -> accepted with output 4", { timeout: 90000 }, async () => {
     const res = await runCode({
       language: "javascript",
       code: "console.log(2 + 2);"
@@ -108,10 +118,31 @@ test("Integration Tests: Real Docker Container Execution", async (t) => {
     assert.strictEqual(res.stdout.trim(), "4");
     assert.strictEqual(res.stderr, "");
     assert.ok(res.timeMs >= 0);
+    assert.ok(res.containerStartupMs > 0, "Container/interpreter startup should be measured separately");
+    assert.ok(res.programTimeMs >= 0, "Program execution time should be measured separately");
+    assert.ok(res.queueWaitMs >= 0, "Queue wait should be measured separately");
+  });
+
+  await t.test("Short programs survive concurrent queue and container startup", { timeout: 120000 }, async () => {
+    const results = await Promise.all([0, 1, 2].map(index => runCode({
+      language: "javascript",
+      code: `console.log("queued-${index}");`,
+      timeLimitMs: 5000,
+      useCache: false
+    })));
+
+    for (let index = 0; index < results.length; index++) {
+      assert.strictEqual(results[index].status, "accepted");
+      assert.strictEqual(results[index].stdout.trim(), `queued-${index}`);
+      assert.ok(results[index].queueWaitMs >= 0);
+      assert.ok(results[index].containerStartupMs > 0);
+      assert.ok(results[index].programTimeMs >= 0);
+    }
+    assert.ok(results.some(result => result.queueWaitMs > 0), "One concurrent run should report queue waiting");
   });
 
   // 3. Infinite loop timeout handling
-  await t.test("Python: infinite loop triggers timeout status and terminates", async () => {
+  await t.test("Python: infinite loop triggers timeout status and terminates", { timeout: 90000 }, async () => {
     const res = await runCode({
       language: "python",
       code: "while True: pass",
@@ -120,10 +151,11 @@ test("Integration Tests: Real Docker Container Execution", async (t) => {
 
     assert.strictEqual(res.status, "timeout");
     assert.ok(res.stderr.includes("timed out"), "Stderr should report timeout notice");
+    assert.ok(res.programTimeMs >= 1500, "The full user-code timeout must begin after startup");
   });
 
   // 4. Syntax error handling
-  await t.test("Python: syntax error maps to compile_error", async () => {
+  await t.test("Python: syntax error maps to compile_error", { timeout: 90000 }, async () => {
     const res = await runCode({
       language: "python",
       code: "def invalid_syntax(:"
@@ -134,7 +166,7 @@ test("Integration Tests: Real Docker Container Execution", async (t) => {
   });
 
   // 5. JavaScript syntax error handling
-  await t.test("Node.js: syntax error maps to compile_error", async () => {
+  await t.test("Node.js: syntax error maps to compile_error", { timeout: 90000 }, async () => {
     const res = await runCode({
       language: "javascript",
       code: "const bad = ;"
@@ -145,7 +177,7 @@ test("Integration Tests: Real Docker Container Execution", async (t) => {
   });
 
   // 6. Caching of identical execution
-  await t.test("Cache: re-running identical code returns cached result with 0ms", async () => {
+  await t.test("Cache: re-running identical code returns cached result with 0ms", { timeout: 90000 }, async () => {
     const code = "print('CACHED_TEST_OUTPUT')";
     const run1 = await runCode({ language: "python", code });
     assert.strictEqual(run1.status, "accepted");
